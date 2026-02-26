@@ -8,6 +8,17 @@ import 'pages/settings.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
+// models imports. uncomment to use
+// import 'data/models/user_model.dart';
+// import 'data/models/avatar_model.dart';
+// import 'data/models/shop_item_model.dart';
+// import 'data/models/diary_entry_model.dart';
+
+// repositories imports
+import 'data/repositories/user_repository.dart';
+import 'data/repositories/shop_repository.dart';
+import 'data/repositories/diary_repository.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +51,10 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+
+  final UserRepository userRepo = UserRepository();
+  final ShopRepository shopRepo = ShopRepository();
+  final DiaryRepository diaryRepo = DiaryRepository();
 
   int selectedIndex = 2;
 

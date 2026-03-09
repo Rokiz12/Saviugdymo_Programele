@@ -38,11 +38,11 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int selectedIndex = 2;
+  late TabController tabController;
 
-  final List<Widget> pages = const[
+  final List<Widget> pages = const [
     MinigamesPage(),
     AvatarPage(),
     HabitsPage(),
@@ -50,23 +50,46 @@ class _MainScreenState extends State<MainScreen> {
     SettingsPage()
   ];
 
-  void onItemTapped(int index){
-    setState((){
-      selectedIndex = index;
+  @override
+  void initState() {
+    super.initState();
+    tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: selectedIndex,
+    );
+
+    tabController.addListener(() {
+      if (tabController.index != selectedIndex) {
+        setState(() {
+          selectedIndex = tabController.index;
+        });
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    tabController.dispose();
+    super.dispose();
+  }
+
+  void onItemTapped(int index) {
+    tabController.animateTo(index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      //Bottom navigation bar
-      body: pages[selectedIndex],
-
+      body: TabBarView(
+        controller: tabController,
+        children: pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: onItemTapped,
         type: BottomNavigationBarType.fixed,
-        items: const[
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.videogame_asset),
             label: "Žaidimai",
@@ -92,6 +115,5 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
 
 

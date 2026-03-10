@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
-import '../models/avatar_model.dart';
 
 class UserRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -24,10 +23,18 @@ class UserRepository {
     );
   }
 
-  /// save avatar
-  Future<void> updateAvatar(String userId, AvatarModel avatar) async {
+  Future<void> equipPet(String userId, String petId) async {
+    await _users.doc(userId).update({'equippedPetId': petId});
+  }
+
+  Future<void> addOwnedPet(String userId, String petId) async {
     await _users.doc(userId).update({
-      'avatar': avatar.toMap(),
+      'ownedPetIds': FieldValue.arrayUnion([petId]),
     });
   }
+
+  Future<void> updatePetMood(String userId, String mood) async {
+    await _users.doc(userId).update({'petMood': mood});
+  }
+
 }

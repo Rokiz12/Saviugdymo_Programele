@@ -41,9 +41,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int selectedIndex = 2;
   late TabController tabController;
-
+  static const String _userId = 'test_user_123';
   final List<Widget> pages = const [
-    MinigamesPage(),
+    CollectionPage(userId: _userId),
     AvatarPage(),
     HabitsPage(),
     DiaryPage(),
@@ -92,7 +92,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.videogame_asset),
-            label: "Žaidimai",
+            label: "Kolekcija",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

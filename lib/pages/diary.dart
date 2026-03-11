@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import '../data/repositories/diary_repository.dart';
+import '../data/models/diary_entry_model.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -10,6 +12,10 @@ class DiaryPage extends StatefulWidget {
 
 class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final DiaryRepository _repository = DiaryRepository();
+
+  // Laikinas useris
+  final String _userId = "test_user_123";
 
   // Mood tracker kintamieji
   String selectedMood = "";
@@ -17,39 +23,8 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
   final betterController = TextEditingController();
   final gratitudeController = TextEditingController();
 
-  // Laisvo dienoraščio kintamasis
+  // Dienorasti inputas
   final freeJournalController = TextEditingController();
-
-  // TESTINIAI DUOMENYS (vėliau pakeisi į duomenų bazę)
-  List<Map<String, dynamic>> diaryEntries = [
-    {
-      'date': 'Vasaris 24, 2026',
-      'mood': '😀 Puikiai',
-      'preview': 'Pasivaikščiojimas parke. Oras puikus, jaučiausi energingas.',
-      'highlight': 'Pasivaikščiojimas parke',
-      'better': 'Galėjau anksčiau keltis',
-      'gratitude': 'Saulėta diena',
-      'freeText': 'Šiandien buvo nuostabi diena. Oras puikus, jaučiausi energingas.',
-    },
-    {
-      'date': 'Vasaris 23, 2026',
-      'mood': '🙂 Gerai',
-      'preview': 'Kava su draugu. Malonu prisiminti senus laikus.',
-      'highlight': 'Kava su draugu',
-      'better': 'Daug darbo',
-      'gratitude': 'Draugystė',
-      'freeText': 'Susitikau su senu draugu. Malonu prisiminti senus laikus.',
-    },
-    {
-      'date': 'Vasaris 22, 2026',
-      'mood': '😐 Normaliai',
-      'preview': 'Skaičiau knygą. Ramu.',
-      'highlight': 'Nauja knyga',
-      'better': 'Galėjau daugiau perskaityti',
-      'gratitude': 'Ramybė',
-      'freeText': 'Skaičiau knygą. Ramu.',
-    },
-  ];
 
   @override
   void initState() {
@@ -73,19 +48,25 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  // ============ NAUJAS ĮRAŠAS ============
+  // id kurimas
+  String _generateId() {
+    final now = DateTime.now();
+    final random = Random().nextInt(10000);
+    return '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}${now.millisecond.toString().padLeft(3, '0')}_$random';
+  }
+
+  // Irasas
   Widget _buildNewEntryTab() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Mood selection
-          Text(
+          const Text(
             "Kaip šiandien jautiesi?",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -98,89 +79,114 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
             ],
           ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
-          // Mood tracker questions
           _questionField("Kas šiandien nutiko gero?", highlightController),
           _questionField("Kas galėjo būti geriau?", betterController),
           _questionField("Už ką tu šiandien dėkingas?", gratitudeController),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-          // Separator
           Divider(thickness: 2, color: Colors.grey[300]),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-          // Free journal
           _freeJournalField(),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
-          // Save button
           Center(
             child: ElevatedButton(
               onPressed: _saveEntry,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
                 foregroundColor: Colors.black,
-                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: Text(
+              child: const Text(
                 "Išsaugoti įrašą",
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
 
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  // ============ ĮRAŠŲ PERŽIŪRA ============
+  // Irasu perziura
   Widget _buildViewEntriesTab() {
-    return ListView.builder(
-      padding: EdgeInsets.all(16),
-      itemCount: diaryEntries.length,
-      itemBuilder: (context, index) {
-        final entry = diaryEntries[index];
-        return Card(
-          margin: EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.yellow[100],
-                borderRadius: BorderRadius.circular(8),
+    return StreamBuilder<List<DiaryEntryModel>>(
+      stream: _repository.streamEntries(_userId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Klaida: ${snapshot.error}",
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final entries = snapshot.data ?? [];
+
+        if (entries.isEmpty) {
+          return const Center(
+            child: Text(
+              "Dar nėra įrašų",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            final entry = entries[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.yellow[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    entry.mood,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                title: Text(
+                  _formatDate(entry.createdAt),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  entry.preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => _showEntryDetails(entry),
               ),
-              child: Text(
-                entry['mood'],
-                style: TextStyle(fontSize: 14),
-              ),
-            ),
-            title: Text(
-              entry['date'],
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              entry['preview'],
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => _showEntryDetails(entry),
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  // ============ HELPER WIDGETS ============
+  // Pagalbiniai widgetai
 
   Widget _moodButton(String emoji, String label) {
     bool isSelected = selectedMood == label;
@@ -193,7 +199,7 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isSelected ? Colors.yellow[200] : Colors.grey[200],
               borderRadius: BorderRadius.circular(12),
@@ -201,11 +207,11 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
             ),
             child: Text(
               emoji,
-              style: TextStyle(fontSize: 28),
+              style: const TextStyle(fontSize: 28),
             ),
           ),
-          SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
@@ -217,9 +223,9 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
       children: [
         Text(
           question,
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
-        SizedBox(height: 6),
+        const SizedBox(height: 6),
         TextField(
           controller: controller,
           maxLines: 2,
@@ -232,7 +238,7 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
             fillColor: Colors.grey[50],
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -241,11 +247,11 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           "Laisvas dienoraštis",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        SizedBox(height: 6),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey[300]!),
@@ -255,51 +261,59 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
             controller: freeJournalController,
             maxLines: 5,
             decoration: InputDecoration(
-              hintText: "Rašyk ką nori...",
+              hintText: "Rašyk čia...",
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: EdgeInsets.all(16),
+              contentPadding: const EdgeInsets.all(16),
               filled: true,
               fillColor: Colors.white,
             ),
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
       ],
     );
   }
 
-  void _saveEntry() {
+  // funkcijos
+
+  void _saveEntry() async {
     if (selectedMood.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Pasirink nuotaiką!")),
+        const SnackBar(content: Text("Pasirink nuotaiką!")),
       );
       return;
     }
 
-    // Sukuriam naują įrašą
-    Map<String, dynamic> newEntry = {
-      'date': 'Vasaris ${DateTime.now().day}, 2026',
-      'mood': _getMoodEmoji(selectedMood) + " " + selectedMood,
-      'preview': highlightController.text.isNotEmpty
-          ? highlightController.text
-          : (freeJournalController.text.isNotEmpty
-          ? freeJournalController.text.substring(0, min(50, freeJournalController.text.length))
-          : "Tuščias įrašas"),
-      'highlight': highlightController.text,
-      'better': betterController.text,
-      'gratitude': gratitudeController.text,
-      'freeText': freeJournalController.text,
-    };
+    final now = DateTime.now();
 
-    setState(() {
-      diaryEntries.insert(0, newEntry);
-    });
+    // Sukuriam ID iš DateTime
+    final String id = _generateId();
+
+    // Sukuriam naują įrašą naudojant modelį
+    final newEntry = DiaryEntryModel(
+      id: id,
+      createdAt: now,
+      mood: _getMoodEmoji(selectedMood) + " " + selectedMood,
+      highlight: highlightController.text,
+      better: betterController.text,
+      gratitude: gratitudeController.text,
+      diaryText: freeJournalController.text,
+      preview: DiaryEntryModel.generatePreview(
+        highlightController.text,
+        freeJournalController.text,
+      ),
+    );
+
+    // Saugom į Firestore
+    await _repository.addEntry(_userId, newEntry);
 
     // Išvalom laukus
-    selectedMood = "";
+    setState(() {
+      selectedMood = "";
+    });
     highlightController.clear();
     betterController.clear();
     gratitudeController.clear();
@@ -307,7 +321,7 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
 
     // Rodom patvirtinimą
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Text("Įrašas išsaugotas!"),
         backgroundColor: Colors.green,
       ),
@@ -328,11 +342,32 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
     }
   }
 
-  void _showEntryDetails(Map<String, dynamic> entry) {
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final entryDate = DateTime(date.year, date.month, date.day);
+
+    if (entryDate == today) {
+      return "Šiandien";
+    }
+
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (entryDate == yesterday) {
+      return "Vakar";
+    }
+
+    const months = [
+      'Sausio', 'Vasario', 'Kovo', 'Balandžio', 'Gegužės', 'Birželio',
+      'Liepos', 'Rugpjūčio', 'Rugsėjo', 'Spalio', 'Lapkričio', 'Gruodžio'
+    ];
+    return '${date.day} ${months[date.month - 1]}';
+  }
+
+  void _showEntryDetails(DiaryEntryModel entry) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(entry['date']),
+        title: Text(_formatDate(entry.createdAt)),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,39 +375,39 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
             children: [
               // Mood
               Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.yellow[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(entry['mood']),
+                child: Text(entry.mood),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Mood tracker answers
-              if (entry['highlight'].isNotEmpty) ...[
-                Text("✨ Kas gero:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry['highlight']),
-                SizedBox(height: 8),
+              if (entry.highlight.isNotEmpty) ...[
+                const Text("✨ Kas gero:", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(entry.highlight),
+                const SizedBox(height: 8),
               ],
 
-              if (entry['better'].isNotEmpty) ...[
-                Text("📝 Galėjo būti geriau:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry['better']),
-                SizedBox(height: 8),
+              if (entry.better.isNotEmpty) ...[
+                const Text("📝 Galėjo būti geriau:", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(entry.better),
+                const SizedBox(height: 8),
               ],
 
-              if (entry['gratitude'].isNotEmpty) ...[
-                Text("🙏 Dėkingas:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry['gratitude']),
-                SizedBox(height: 8),
+              if (entry.gratitude.isNotEmpty) ...[
+                const Text("🙏 Dėkingas:", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(entry.gratitude),
+                const SizedBox(height: 8),
               ],
 
               // Free journal
-              if (entry['freeText'].isNotEmpty) ...[
-                Divider(),
-                Text("📖 Dienoraštis:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry['freeText']),
+              if (entry.diaryText.isNotEmpty) ...[
+                const Divider(),
+                const Text("📖 Dienoraštis:", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(entry.diaryText),
               ],
             ],
           ),
@@ -380,12 +415,13 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Uždaryti"),
+            child: const Text("Uždaryti"),
           ),
         ],
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +447,7 @@ class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMix
           indicatorColor: Colors.black,
         ),
       ),
-      body: IndexedStack(  // ← VISIŠKAI JOKIO SCROLL
+      body: IndexedStack(
         index: _tabController.index,
         children: [
           _buildNewEntryTab(),

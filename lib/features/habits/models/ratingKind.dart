@@ -1,0 +1,1 @@
+enum RatingKind { checkbox, number, scale, enumerator}

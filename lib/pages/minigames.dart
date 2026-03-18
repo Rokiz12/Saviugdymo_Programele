@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../data/models/pet_model.dart';
 import '../data/models/user_model.dart';
+import '../data/models/user_pet_progress.dart';
 import '../data/repositories/pet_repository.dart';
 import '../data/repositories/user_repository.dart';
 
@@ -18,9 +19,13 @@ class _CollectionPageState extends State<CollectionPage> {
   final UserRepository _userRepository = UserRepository();
 
   List<PetModel> _allPets = [];
-  Set<String> _ownedPetIds = {};
+
+  Map<String, UserPetProgress> _ownedPets = {};
+
   bool _isLoading = true;
   String? _error;
+
+  Set<String> get _ownedPetIds => _ownedPets.keys.toSet();
 
   @override
   void initState() {
@@ -45,7 +50,7 @@ class _CollectionPageState extends State<CollectionPage> {
 
       setState(() {
         _allPets = pets;
-        _ownedPetIds = user?.ownedPetIds.toSet() ?? {};
+        _ownedPets = user?.ownedPets ?? {};
         _isLoading = false;
       });
     } catch (e) {
@@ -55,7 +60,6 @@ class _CollectionPageState extends State<CollectionPage> {
       });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +116,7 @@ class _CollectionPageState extends State<CollectionPage> {
             return _RaritySection(
               rarity: entry.key,
               pets: entry.value,
-              ownedPetIds: _ownedPetIds,
+              ownedPets: _ownedPets,
             );
           }).toList(),
         ),
@@ -150,19 +154,22 @@ Color _rarityBackColor(String rarity) {
 class _RaritySection extends StatelessWidget {
   final String rarity;
   final List<PetModel> pets;
-  final Set<String> ownedPetIds;
+
+  final Map<String, UserPetProgress> ownedPets;
 
   const _RaritySection({
     required this.rarity,
     required this.pets,
-    required this.ownedPetIds,
+    required this.ownedPets,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = _rarityColor(rarity);
+    final ownedIds = ownedPets.keys.toSet();
+
     final ownedCount =
-        ownedPetIds.intersection(pets.map((p) => p.id).toSet()).length;
+        ownedIds.intersection(pets.map((p) => p.id).toSet()).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,9 +213,12 @@ class _RaritySection extends StatelessWidget {
           ),
           itemBuilder: (context, index) {
             final pet = pets[index];
-            final isOwned = ownedPetIds.contains(pet.id);
+            final userPet = ownedPets[pet.id];
+            final isOwned = userPet != null;
+
             return _FlipPetCard(
               pet: pet,
+              userPet: userPet,
               isOwned: isOwned,
               rarityColor: color,
               rarityBackColor: _rarityBackColor(rarity),
@@ -221,15 +231,16 @@ class _RaritySection extends StatelessWidget {
   }
 }
 
-
 class _FlipPetCard extends StatefulWidget {
   final PetModel pet;
+  final UserPetProgress? userPet;
   final bool isOwned;
   final Color rarityColor;
   final Color rarityBackColor;
 
   const _FlipPetCard({
     required this.pet,
+    required this.userPet,
     required this.isOwned,
     required this.rarityColor,
     required this.rarityBackColor,
@@ -292,6 +303,7 @@ class _FlipPetCardState extends State<_FlipPetCard>
             child: showBack
                 ? _CardBack(
               pet: widget.pet,
+              userPet: widget.userPet,
               isOwned: widget.isOwned,
               rarityColor: widget.rarityColor,
               rarityBackColor: widget.rarityBackColor,
@@ -333,21 +345,11 @@ class _CardFront extends StatelessWidget {
           width: isOwned ? 2 : 1,
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: isOwned
-            ? [
-          BoxShadow(
-            color: rarityColor.withValues(alpha: 0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ]
-            : null,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Stack(
           children: [
-            // Pet image
             Positioned.fill(
               child: ColorFiltered(
                 colorFilter: isOwned
@@ -360,30 +362,11 @@ class _CardFront extends StatelessWidget {
                   0,      0,      0,      1, 0,
                 ]),
                 child: imageUrl.isNotEmpty
-                    ? Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded /
-                            progress.expectedTotalBytes!
-                            : null,
-                        strokeWidth: 2,
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) =>
-                      Icon(Icons.pets,
-                          size: 40, color: Colors.grey.shade400),
-                )
+                    ? Image.network(imageUrl, fit: BoxFit.cover)
                     : Icon(Icons.pets,
                     size: 40, color: Colors.grey.shade400),
               ),
             ),
-            // Lock badge for unowned
             if (!isOwned)
               Positioned(
                 top: 6,
@@ -398,18 +381,6 @@ class _CardFront extends StatelessWidget {
                   const Icon(Icons.lock, size: 12, color: Colors.white),
                 ),
               ),
-            // Tap hint
-            Positioned(
-              bottom: 5,
-              right: 5,
-              child: Icon(
-                Icons.info_outline,
-                size: 14,
-                color: isOwned
-                    ? rarityColor.withValues(alpha: 0.85)
-                    : Colors.grey.shade400,
-              ),
-            ),
           ],
         ),
       ),
@@ -417,18 +388,16 @@ class _CardFront extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Card back — shows name + lore
-// ---------------------------------------------------------------------------
-
 class _CardBack extends StatelessWidget {
   final PetModel pet;
+  final UserPetProgress? userPet; 
   final bool isOwned;
   final Color rarityColor;
   final Color rarityBackColor;
 
   const _CardBack({
     required this.pet,
+    required this.userPet,
     required this.isOwned,
     required this.rarityColor,
     required this.rarityBackColor,
@@ -444,31 +413,11 @@ class _CardBack extends StatelessWidget {
           width: isOwned ? 2 : 1,
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: isOwned
-            ? [
-          BoxShadow(
-            color: rarityColor.withValues(alpha: 0.25),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ]
-            : null,
       ),
       padding: const EdgeInsets.all(8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Rarity dot
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: isOwned ? rarityColor : Colors.grey.shade400,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(height: 5),
-          // Pet name
           Text(
             isOwned ? pet.name : '???',
             style: TextStyle(
@@ -480,29 +429,31 @@ class _CardBack extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 5),
-          // Divider
-          Container(
-            height: 1,
-            color: isOwned
-                ? rarityColor.withValues(alpha: 0.3)
-                : Colors.grey.shade300,
-          ),
-          const SizedBox(height: 5),
-          // Lore
+          const SizedBox(height: 6),
+
+          if (isOwned && userPet != null) ...[
+            Text('Level ${userPet!.level}',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: rarityColor)),
+            const SizedBox(height: 2),
+            Text('XP: ${userPet!.xp}',
+                style: const TextStyle(fontSize: 9)),
+            const SizedBox(height: 6),
+          ],
+
           Expanded(
             child: Text(
               isOwned
-                  ? pet.lore
+                  ? pet.lore['level_1'] ?? ''
                   : 'Unlock this pet to reveal its secrets...',
               style: TextStyle(
                 fontSize: 9,
                 color: isOwned ? Colors.black54 : Colors.grey.shade400,
                 fontStyle: FontStyle.italic,
-                height: 1.3,
               ),
               textAlign: TextAlign.center,
-              overflow: TextOverflow.fade,
             ),
           ),
         ],

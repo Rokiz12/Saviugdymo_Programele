@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import '../models/user_pet_progress.dart';
 
 class UserRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -29,7 +30,26 @@ class UserRepository {
 
   Future<void> addOwnedPet(String userId, String petId) async {
     await _users.doc(userId).update({
-      'ownedPetIds': FieldValue.arrayUnion([petId]),
+      'ownedPets.$petId': {
+        'xp': 0,
+        'level': 1,
+      }
+    });
+  }
+
+  Future<void> addPetXp(String userId, String petId, int xpToAdd) async {
+    final user = await getUser(userId);
+    if (user == null) return;
+
+    final current = user.ownedPets[petId] ?? UserPetProgress();
+    final newXp = current.xp + xpToAdd;
+    final newLevel = (newXp / 100).floor() + 1; // every 100xp = 1 level
+
+    await _users.doc(userId).update({
+      'ownedPets.$petId': {
+        'xp': newXp,
+        'level': newLevel,
+      }
     });
   }
 

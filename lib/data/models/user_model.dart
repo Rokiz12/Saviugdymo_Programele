@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'user_pet_progress.dart';
 // models/user_model.dart
 class UserModel {
   final String id;
@@ -9,7 +9,7 @@ class UserModel {
   final int coins;
   final DateTime createdAt;
   final String equippedPetId;
-  final List<String> ownedPetIds;
+  final Map<String, UserPetProgress> ownedPets;
   final String petMood;
 
   UserModel({
@@ -20,7 +20,7 @@ class UserModel {
     this.coins = 0,
     required this.createdAt,
     this.equippedPetId = '',
-    this.ownedPetIds = const [],
+    this.ownedPets = const {},
     this.petMood = 'happy',
   });
 
@@ -33,7 +33,12 @@ class UserModel {
       coins: map['coins'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       equippedPetId: map['equippedPetId'] ?? '',
-      ownedPetIds: List<String>.from(map['ownedPetIds'] ?? []),
+      ownedPets: (map['ownedPets'] as Map<String, dynamic>? ?? {}).map(
+            (petId, data) => MapEntry(
+          petId,
+          UserPetProgress.fromMap(Map<String, dynamic>.from(data as Map)),
+        ),
+      ),
       petMood: map['petMood'] ?? 'happy',
     );
   }
@@ -46,7 +51,7 @@ class UserModel {
       'coins': coins,
       'createdAt': createdAt,
       'equippedPetId': equippedPetId,
-      'ownedPetIds': ownedPetIds,
+      'ownedPets': ownedPets.map((petId, progress) => MapEntry(petId, progress.toMap())),
       'petMood': petMood,
     };
   }

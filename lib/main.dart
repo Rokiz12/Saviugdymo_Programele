@@ -1,38 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'pages/avatar.dart';
 import 'pages/diary.dart';
 import 'pages/habits.dart';
 import 'pages/minigames.dart';
 import 'pages/settings.dart';
-
-import 'package:firebase_core/firebase_core.dart';
+import 'pages/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp();
-
-
   runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: MainScreen(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasData) {
+            return MainScreen(userId: snapshot.data!.uid);
+          }
+          return const LoginPage();
+        },
+      ),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen ({super.key});
+  final String userId;
+  const MainScreen({super.key, required this.userId});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -41,18 +51,20 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int selectedIndex = 2;
   late TabController tabController;
-  static const String _userId = 'test_user_123';
-  final List<Widget> pages = const [
-    CollectionPage(userId: _userId),
-    AvatarPage(),
-    HabitsPage(),
-    DiaryPage(),
-    SettingsPage()
-  ];
+  late List<Widget> pages;
 
   @override
   void initState() {
     super.initState();
+
+    pages = [
+      CollectionPage(userId: widget.userId),
+      AvatarPage(),
+      HabitsPage(),
+      DiaryPage(),
+      SettingsPage(),
+    ];
+
     tabController = TabController(
       length: 5,
       vsync: this,
@@ -115,5 +127,3 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
   }
 }
-
-

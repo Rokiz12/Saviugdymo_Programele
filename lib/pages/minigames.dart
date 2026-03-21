@@ -19,13 +19,10 @@ class _CollectionPageState extends State<CollectionPage> {
   final UserRepository _userRepository = UserRepository();
 
   List<PetModel> _allPets = [];
-
   Map<String, UserPetProgress> _ownedPets = {};
 
   bool _isLoading = true;
   String? _error;
-
-  Set<String> get _ownedPetIds => _ownedPets.keys.toSet();
 
   @override
   void initState() {
@@ -117,6 +114,8 @@ class _CollectionPageState extends State<CollectionPage> {
               rarity: entry.key,
               pets: entry.value,
               ownedPets: _ownedPets,
+              userId: widget.userId,
+              userRepository: _userRepository,
             );
           }).toList(),
         ),
@@ -154,13 +153,16 @@ Color _rarityBackColor(String rarity) {
 class _RaritySection extends StatelessWidget {
   final String rarity;
   final List<PetModel> pets;
-
   final Map<String, UserPetProgress> ownedPets;
+  final String userId;
+  final UserRepository userRepository;
 
   const _RaritySection({
     required this.rarity,
     required this.pets,
     required this.ownedPets,
+    required this.userId,
+    required this.userRepository,
   });
 
   @override
@@ -216,12 +218,14 @@ class _RaritySection extends StatelessWidget {
             final userPet = ownedPets[pet.id];
             final isOwned = userPet != null;
 
-            return _FlipPetCard(
+            return _PetCard(
               pet: pet,
               userPet: userPet,
               isOwned: isOwned,
               rarityColor: color,
               rarityBackColor: _rarityBackColor(rarity),
+              userId: userId,
+              userRepository: userRepository,
             );
           },
         ),
@@ -231,105 +235,41 @@ class _RaritySection extends StatelessWidget {
   }
 }
 
-class _FlipPetCard extends StatefulWidget {
+class _PetCard extends StatelessWidget {
   final PetModel pet;
   final UserPetProgress? userPet;
   final bool isOwned;
   final Color rarityColor;
   final Color rarityBackColor;
+  final String userId;
+  final UserRepository userRepository;
 
-  const _FlipPetCard({
+  const _PetCard({
     required this.pet,
     required this.userPet,
     required this.isOwned,
     required this.rarityColor,
     required this.rarityBackColor,
+    required this.userId,
+    required this.userRepository,
   });
 
-  @override
-  State<_FlipPetCard> createState() => _FlipPetCardState();
-}
-
-class _FlipPetCardState extends State<_FlipPetCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-  bool _isFlipped = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _animation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _flip() {
-    if (_isFlipped) {
-      _controller.reverse();
-    } else {
-      _controller.forward();
-    }
-    setState(() => _isFlipped = !_isFlipped);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _flip,
-      child: AnimatedBuilder(
-        animation: _animation,
-        builder: (context, child) {
-          final showBack = _animation.value >= 0.5;
-          final angle = showBack
-              ? (1 - _animation.value) * pi
-              : _animation.value * pi;
-
-          return Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.001)
-              ..rotateY(angle),
-            child: showBack
-                ? _CardBack(
-              pet: widget.pet,
-              userPet: widget.userPet,
-              isOwned: widget.isOwned,
-              rarityColor: widget.rarityColor,
-              rarityBackColor: widget.rarityBackColor,
-            )
-                : _CardFront(
-              pet: widget.pet,
-              isOwned: widget.isOwned,
-              rarityColor: widget.rarityColor,
-            ),
-          );
-        },
+  void _openPopup(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PetDetailSheet(
+        pet: pet,
+        userPet: userPet,
+        isOwned: isOwned,
+        rarityColor: rarityColor,
+        rarityBackColor: rarityBackColor,
+        userId: userId,
+        userRepository: userRepository,
       ),
     );
   }
-}
-
-class _CardFront extends StatelessWidget {
-  final PetModel pet;
-  final bool isOwned;
-  final Color rarityColor;
-
-  const _CardFront({
-    required this.pet,
-    required this.isOwned,
-    required this.rarityColor,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -337,123 +277,376 @@ class _CardFront extends StatelessWidget {
         pet.images.values.firstOrNull ??
         '';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isOwned ? Colors.white : Colors.grey.shade100,
-        border: Border.all(
-          color: isOwned ? rarityColor : Colors.grey.shade300,
-          width: isOwned ? 2 : 1,
+    return GestureDetector(
+      onTap: () => _openPopup(context),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isOwned ? Colors.white : Colors.grey.shade100,
+          border: Border.all(
+            color: isOwned ? rarityColor : Colors.grey.shade300,
+            width: isOwned ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
         ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: ColorFiltered(
-                colorFilter: isOwned
-                    ? const ColorFilter.mode(
-                    Colors.transparent, BlendMode.dst)
-                    : const ColorFilter.matrix(<double>[
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0,      0,      0,      1, 0,
-                ]),
-                child: imageUrl.isNotEmpty
-                    ? Image.network(imageUrl, fit: BoxFit.cover)
-                    : Icon(Icons.pets,
-                    size: 40, color: Colors.grey.shade400),
-              ),
-            ),
-            if (!isOwned)
-              Positioned(
-                top: 6,
-                right: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child:
-                  const Icon(Icons.lock, size: 12, color: Colors.white),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ColorFiltered(
+                  colorFilter: isOwned
+                      ? const ColorFilter.mode(
+                      Colors.transparent, BlendMode.dst)
+                      : const ColorFilter.matrix(<double>[
+                    0.2126, 0.7152, 0.0722, 0, 0,
+                    0.2126, 0.7152, 0.0722, 0, 0,
+                    0.2126, 0.7152, 0.0722, 0, 0,
+                    0,      0,      0,      1, 0,
+                  ]),
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(imageUrl, fit: BoxFit.cover)
+                      : Icon(Icons.pets,
+                      size: 40, color: Colors.grey.shade400),
                 ),
               ),
-          ],
+              if (!isOwned)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child:
+                    const Icon(Icons.lock, size: 12, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _CardBack extends StatelessWidget {
+class _PetDetailSheet extends StatefulWidget {
   final PetModel pet;
-  final UserPetProgress? userPet; 
+  final UserPetProgress? userPet;
   final bool isOwned;
   final Color rarityColor;
   final Color rarityBackColor;
+  final String userId;
+  final UserRepository userRepository;
 
-  const _CardBack({
+  const _PetDetailSheet({
     required this.pet,
     required this.userPet,
     required this.isOwned,
     required this.rarityColor,
     required this.rarityBackColor,
+    required this.userId,
+    required this.userRepository,
+  });
+
+  @override
+  State<_PetDetailSheet> createState() => _PetDetailSheetState();
+}
+
+class _PetDetailSheetState extends State<_PetDetailSheet> {
+  bool _isEquipping = false;
+
+  Future<void> _equip() async {
+    setState(() => _isEquipping = true);
+    try {
+      await widget.userRepository.equipPet(widget.userId, widget.pet.id);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.pet.name} equipped!'),
+            backgroundColor: widget.rarityColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to equip pet: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isEquipping = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = widget.pet.images['collection'] ??
+        widget.pet.images.values.firstOrNull ??
+        '';
+
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Container(
+      height: screenHeight * 0.75,
+      decoration: BoxDecoration(
+        color: widget.isOwned ? widget.rarityBackColor : Colors.grey.shade50,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(
+          top: BorderSide(
+            color: widget.isOwned ? widget.rarityColor : Colors.grey.shade300,
+            width: 3,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Pet image
+                  Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: widget.isOwned
+                            ? widget.rarityColor
+                            : Colors.grey.shade300,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.isOwned
+                              ? widget.rarityColor.withValues(alpha: 0.2)
+                              : Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: ColorFiltered(
+                        colorFilter: widget.isOwned
+                            ? const ColorFilter.mode(
+                            Colors.transparent, BlendMode.dst)
+                            : const ColorFilter.matrix(<double>[
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0,      0,      0,      1, 0,
+                        ]),
+                        child: imageUrl.isNotEmpty
+                            ? Image.network(imageUrl, fit: BoxFit.cover)
+                            : Icon(Icons.pets,
+                            size: 60, color: Colors.grey.shade400),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Pet name
+                  Text(
+                    widget.isOwned ? widget.pet.name : '???',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: widget.isOwned
+                          ? Colors.black87
+                          : Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // Rarity badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: widget.isOwned
+                          ? widget.rarityColor.withValues(alpha: 0.15)
+                          : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: widget.isOwned
+                            ? widget.rarityColor
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Text(
+                      widget.pet.rarity,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: widget.isOwned
+                            ? widget.rarityColor
+                            : Colors.grey.shade500,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Level & XP row (owned only)
+                  if (widget.isOwned && widget.userPet != null) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _StatChip(
+                          label: 'Level',
+                          value: '${widget.userPet!.level}',
+                          color: widget.rarityColor,
+                        ),
+                        const SizedBox(width: 12),
+                        _StatChip(
+                          label: 'XP',
+                          value: '${widget.userPet!.xp}',
+                          color: widget.rarityColor,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // Divider
+                  Divider(color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+
+                  // Lore section
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      widget.isOwned ? 'Lore' : 'Lore (Locked)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: widget.isOwned
+                            ? Colors.black87
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.isOwned
+                        ? widget.pet.lore['level_1'] ?? 'No lore available.'
+                        : 'Unlock this pet to reveal its secrets...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: widget.isOwned
+                          ? Colors.black54
+                          : Colors.grey.shade400,
+                      fontStyle: FontStyle.italic,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.left,
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Equip button
+                  if (widget.isOwned)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isEquipping ? null : _equip,
+                        icon: _isEquipping
+                            ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                            : const Icon(Icons.check_circle_outline),
+                        label: Text(_isEquipping ? 'Equipping...' : 'Equip'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: widget.rarityColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: isOwned ? rarityBackColor : Colors.grey.shade100,
-        border: Border.all(
-          color: isOwned ? rarityColor : Colors.grey.shade300,
-          width: isOwned ? 2 : 1,
-        ),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      padding: const EdgeInsets.all(8),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            isOwned ? pet.name : '???',
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: isOwned ? Colors.black87 : Colors.grey.shade500,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6),
-
-          if (isOwned && userPet != null) ...[
-            Text('Level ${userPet!.level}',
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: rarityColor)),
-            const SizedBox(height: 2),
-            Text('XP: ${userPet!.xp}',
-                style: const TextStyle(fontSize: 9)),
-            const SizedBox(height: 6),
-          ],
-
-          Expanded(
-            child: Text(
-              isOwned
-                  ? pet.lore['level_1'] ?? ''
-                  : 'Unlock this pet to reveal its secrets...',
-              style: TextStyle(
-                fontSize: 9,
-                color: isOwned ? Colors.black54 : Colors.grey.shade400,
-                fontStyle: FontStyle.italic,
-              ),
-              textAlign: TextAlign.center,
+              color: color.withValues(alpha: 0.8),
             ),
           ),
         ],

@@ -8,6 +8,7 @@ class Habit {
   final int? max; // for int range
   final List<String>? options; // enum options
   final bool archived;
+  final bool systemOnly;
 
   const Habit({
     required this.id,
@@ -16,7 +17,8 @@ class Habit {
     this.min,
     this.max,
     this.options,
-    this.archived = false
+    this.archived = false,
+    this.systemOnly = false,
 });
 
   Habit copyWith({

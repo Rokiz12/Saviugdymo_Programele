@@ -5,6 +5,8 @@ import '../data/models/user_model.dart';
 import '../data/models/user_pet_progress.dart';
 import '../data/repositories/pet_repository.dart';
 import '../data/repositories/user_repository.dart';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CollectionPage extends StatefulWidget {
   final String userId;
@@ -20,9 +22,15 @@ class _CollectionPageState extends State<CollectionPage> {
 
   List<PetModel> _allPets = [];
   Map<String, UserPetProgress> _ownedPets = {};
-
   bool _isLoading = true;
   String? _error;
+  StreamSubscription? _userSubscription;
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -37,19 +45,25 @@ class _CollectionPageState extends State<CollectionPage> {
     });
 
     try {
-      final results = await Future.wait([
-        _petRepository.getAllPets(),
-        _userRepository.getUser(widget.userId),
-      ]);
-
-      final pets = results[0] as List<PetModel>;
-      final user = results[1] as UserModel?;
-
+      final pets = await _petRepository.getAllPets();
       setState(() {
         _allPets = pets;
-        _ownedPets = user?.ownedPets ?? {};
         _isLoading = false;
       });
+
+      // After pets load, start listening to user document in real time
+      _userSubscription = FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .snapshots()
+          .listen((doc) {
+        if (!mounted) return;
+        if (doc.exists) {
+          final user = UserModel.fromMap(doc.id, doc.data()!);
+          setState(() => _ownedPets = user.ownedPets);
+        }
+      });
+
     } catch (e) {
       setState(() {
         _error = 'Failed to load pets: $e';
@@ -105,20 +119,17 @@ class _CollectionPageState extends State<CollectionPage> {
         backgroundColor: Colors.yellow,
         centerTitle: true,
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: sortedEntries.map((entry) {
-            return _RaritySection(
-              rarity: entry.key,
-              pets: entry.value,
-              ownedPets: _ownedPets,
-              userId: widget.userId,
-              userRepository: _userRepository,
-            );
-          }).toList(),
-        ),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: sortedEntries.map((entry) {
+          return _RaritySection(
+            rarity: entry.key,
+            pets: entry.value,
+            ownedPets: _ownedPets,
+            userId: widget.userId,
+            userRepository: _userRepository,
+          );
+        }).toList(),
       ),
     );
   }
@@ -137,18 +148,7 @@ Color _rarityColor(String rarity) {
   }
 }
 
-Color _rarityBackColor(String rarity) {
-  switch (rarity) {
-    case 'Rare':
-      return Colors.blue.shade50;
-    case 'Epic':
-      return Colors.purple.shade50;
-    case 'Legendary':
-      return Colors.orange.shade50;
-    default:
-      return Colors.grey.shade50;
-  }
-}
+
 
 class _RaritySection extends StatelessWidget {
   final String rarity;
@@ -223,7 +223,7 @@ class _RaritySection extends StatelessWidget {
               userPet: userPet,
               isOwned: isOwned,
               rarityColor: color,
-              rarityBackColor: _rarityBackColor(rarity),
+              rarityBackColor: Colors.white,
               userId: userId,
               userRepository: userRepository,
             );
@@ -392,6 +392,15 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
     final screenHeight = MediaQuery.of(context).size.height;
 
+    String _buildLore(Map<String, dynamic> lore, int currentLevel) {
+      final parts = <String>[];
+      for (int i = 1; i <= currentLevel; i++) {
+        final part = lore['level_$i'];
+        if (part != null) parts.add(part);
+      }
+      return parts.isEmpty ? 'No lore available.' : parts.join('\n\n');
+    }
+
     return Container(
       height: screenHeight * 0.75,
       decoration: BoxDecoration(
@@ -547,27 +556,48 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: widget.isOwned
-                            ? Colors.black87
-                            : Colors.grey.shade400,
+                        color: widget.isOwned ? Colors.black87 : Colors.grey.shade400,
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    widget.isOwned
-                        ? widget.pet.lore['level_1'] ?? 'No lore available.'
-                        : 'Unlock this pet to reveal its secrets...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: widget.isOwned
-                          ? Colors.black54
-                          : Colors.grey.shade400,
-                      fontStyle: FontStyle.italic,
-                      height: 1.5,
+                  if (!widget.isOwned)
+                    Text(
+                      'Unlock this pet to reveal its secrets...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade400,
+                        fontStyle: FontStyle.italic,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.left,
+                    )
+                  else if (widget.userPet != null)
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                          fontStyle: FontStyle.italic,
+                          height: 1.5,
+                        ),
+                        children: [
+                          if (widget.userPet!.level > 1)
+                            TextSpan(
+                              text: _buildLore(widget.pet.lore, widget.userPet!.level - 1) + '\n\n',
+                            ),
+                          TextSpan(
+                            text: widget.pet.lore['level_${widget.userPet!.level}'] ?? '',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w600,
+                              fontStyle: FontStyle.italic,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    textAlign: TextAlign.left,
-                  ),
 
                   const SizedBox(height: 28),
 
@@ -653,4 +683,6 @@ class _StatChip extends StatelessWidget {
       ),
     );
   }
+
+
 }

@@ -1,7 +1,12 @@
 // lib/pages/habits.dart
 import 'package:flutter/material.dart';
 import 'package:pvp/features/habits/models/models.dart';
-import 'package:pvp/features/habits/data/dayLogRepository.dart';
+import 'package:pvp/features/habits/data/HabitRepository.dart';
+import 'package:pvp/features/habits/data/foreground_time_tracker.dart';
+
+
+
+
 
 // You can keep this in the same file as the page for now.
 class HabitEditorDialog extends StatefulWidget {
@@ -151,8 +156,8 @@ class HabitsPage extends StatefulWidget {
 }
 
 class _HabitsPageState extends State<HabitsPage> {
-  final _repo = InMemoryDayLogRepository(); // swap later for real DB repo
-  final _userId = 'demo_user';
+  final _repo = FirebaseDayLogRepository();
+  final _userId = 'aaaaaa';
 
   List<Habit> _habits = [];
   DayLog? _today;
@@ -160,8 +165,32 @@ class _HabitsPageState extends State<HabitsPage> {
   @override
   void initState() {
     super.initState();
-    _loadInitial();
+    _loadInitial().then((_) {
+      _ensureAutoHabitExists().then((_) {
+        _startTracker();
+      });
+    }).then((_) {
+      _ensureAutoHabitExists();
+    });
   }
+
+
+
+  Future<void> _ensureUserHasHabits() async {
+    final habits = await _repo.getHabits(userId: _userId);
+    if (habits.isEmpty) {
+      await _repo.addHabit(
+        userId: _userId,
+        habit: Habit(
+          id: 'app2min',
+          name: '2minutes',
+          kind: RatingKind.checkbox,
+          systemOnly: true,
+        ),
+      );
+    }
+  }
+
 
   Future<void> _loadInitial() async {
     final habits = await _repo.getHabits(userId: _userId);
@@ -207,7 +236,6 @@ class _HabitsPageState extends State<HabitsPage> {
     await _repo.addHabit(userId: _userId, habit: habit);
     setState(() => _habits = [..._habits, habit]);
 
-    // Optionally set an initial value for today
     final initVal = _initialValueFor(habit);
     if (initVal != null) {
       _setValue(habit, initVal);
@@ -227,7 +255,6 @@ class _HabitsPageState extends State<HabitsPage> {
       if (i >= 0) _habits[i] = updated;
     });
 
-    // If kind changed, you may want to reset today's value to a compatible default
     if (_today?.entries[updated.id] case final v?) {
       final compatible = _coerceValueIfNeeded(updated, v);
       if (compatible != v) {
@@ -237,6 +264,7 @@ class _HabitsPageState extends State<HabitsPage> {
   }
 
   Future<void> _deleteHabit(Habit h) async {
+    if(h.systemOnly) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -336,8 +364,8 @@ class _HabitsPageState extends State<HabitsPage> {
                           visualDensity: const VisualDensity(vertical: -1),
                           title: Text(h.name, style: const TextStyle(fontSize: 16)),
                           // Tap = edit, hold = delete
-                          onTap: () => _editHabit(h),
-                          onLongPress: () => _deleteHabit(h),
+                          onTap: h.systemOnly ? null : () => _editHabit(h),
+                          onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
                           trailing: _buildTrailingFor(h, v),
                         ),
                       );
@@ -386,13 +414,27 @@ class _HabitsPageState extends State<HabitsPage> {
   // Trailing control rendered by Habit.kind, writes DayLog on change
   Widget _buildTrailingFor(Habit h, RatingValue? v) {
     switch (h.kind) {
+
       case RatingKind.checkbox:
         final checked = (v is BoolValue) ? v.value : false;
+
+        // SYSTEM-ONLY
+        if (h.systemOnly) {
+          return IgnorePointer(
+            child: Checkbox(
+              value: checked,
+              onChanged: null,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          );
+        }
+
         return Checkbox(
           value: checked,
           onChanged: (val) => _setValue(h, BoolValue(val ?? false)),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         );
+
 
       case RatingKind.number:
         final numVal = (v is NumberValue) ? v.value : (h.min ?? 0);
@@ -458,4 +500,52 @@ class _HabitsPageState extends State<HabitsPage> {
         );
     }
   }
+
+
+  ForegroundTimeTracker? _tracker;
+
+
+
+  @override
+  void dispose() {
+    _tracker?.stop(); // <-- clean up
+    super.dispose();
+  }
+
+  Future<void> _ensureAutoHabitExists() async {
+    const auto = Habit(id: 'app2min', name: '2minutes', kind: RatingKind.checkbox, systemOnly: true);
+    final exists = _habits.any((h) => h.id == auto.id);
+    if (!exists) {
+      await _repo.addHabit(userId: _userId, habit: auto);
+      setState(() => _habits = [..._habits, auto]);
+    }
+  }
+
+  void _startTracker() {
+    _tracker = ForegroundTimeTracker(
+      threshold: const Duration(seconds: 2),
+      onReached: (dateUtc) async {
+        DayLog log = _today ?? DayLog(dateUtc: dateUtc, entries: {});
+        if (log.dateUtc.year != dateUtc.year ||
+            log.dateUtc.month != dateUtc.month ||
+            log.dateUtc.day != dateUtc.day) {
+          log = DayLog(dateUtc: dateUtc, entries: {});
+        }
+
+        log = log.setValue('app2min', const BoolValue(true));
+
+        await _repo.upsertDayLog(userId: _userId, log: log);
+        setState(() {
+          final nowUtc = DateTime.now().toUtc();
+          if (log.dateUtc.year == nowUtc.year &&
+              log.dateUtc.month == nowUtc.month &&
+              log.dateUtc.day == nowUtc.day) {
+            _today = log;
+          }
+        });
+      },
+    )..start();
+  }
+
+
 }

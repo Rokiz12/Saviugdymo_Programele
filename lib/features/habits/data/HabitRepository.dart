@@ -1,6 +1,105 @@
 // lib/features/habits/data/day_log_repository.dart
 import '../models/models.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class FirebaseDayLogRepository implements DayLogRepository {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  CollectionReference<Map<String, dynamic>> _habitsRef(String uid) {
+    return _db.collection('users').doc(uid).collection('habits');
+  }
+
+  CollectionReference<Map<String, dynamic>> _dayLogsRef(String uid) {
+    return _db.collection('users').doc(uid).collection('dayLogs');
+  }
+
+  DocumentReference<Map<String, dynamic>> _dayLogDoc(String uid, String yyyymmdd) {
+    return _dayLogsRef(uid).doc(yyyymmdd);
+  }
+
+  @override
+  Future<List<Habit>> getHabits({required String userId}) async {
+    final snap = await _habitsRef(userId).get();
+    return snap.docs.map((d) => Habit.fromJson(d.data())).toList();
+  }
+
+  @override
+  Future<Habit> addHabit({required String userId, required Habit habit}) async {
+    await _habitsRef(userId).doc(habit.id).set(habit.toJson());
+    return habit;
+  }
+
+  @override
+  Future<Habit> updateHabit({required String userId, required Habit habit}) async {
+    await _habitsRef(userId).doc(habit.id).set(habit.toJson());
+    return habit;
+  }
+
+  @override
+  Future<void> deleteHabit({
+    required String userId,
+    required String habitId,
+    bool cascadeDeleteValues = true,
+  }) async {
+    // Delete habit metadata
+    await _habitsRef(userId).doc(habitId).delete();
+
+    if (!cascadeDeleteValues) return;
+
+    // Remove habit values from every DayLog
+    final logsSnap = await _dayLogsRef(userId).get();
+
+    for (final doc in logsSnap.docs) {
+      final data = doc.data();
+      final entries = (data['entries'] as Map<String, dynamic>?);
+
+      if (entries != null && entries.containsKey(habitId)) {
+        entries.remove(habitId);
+        await doc.reference.update({'entries': entries});
+      }
+    }
+  }
+
+  // ========= DAY LOGS =========
+
+  @override
+  Future<List<DayLog>> getLogsForRange({
+    required String userId,
+    required DateTime startInclusive,
+    required DateTime endInclusive,
+  }) async {
+    final start = _fmtDate(startInclusive);
+    final end = _fmtDate(endInclusive);
+
+    final snap = await _dayLogsRef(userId)
+        .where('date', isGreaterThanOrEqualTo: start)
+        .where('date', isLessThanOrEqualTo: end)
+        .orderBy('date')
+        .get();
+
+    return snap.docs.map((d) => DayLog.fromJson(d.data())).toList();
+  }
+
+  @override
+  Future<void> upsertDayLog({
+    required String userId,
+    required DayLog log,
+  }) async {
+    final key = _fmtDate(log.dateUtc);
+    await _dayLogsRef(userId).doc(key).set(log.toJson());
+  }
+
+  // ========= HELPERS =========
+
+  String _fmtDate(DateTime d) {
+    final utc = DateTime.utc(d.year, d.month, d.day);
+    return "${utc.year.toString().padLeft(4, '0')}-"
+        "${utc.month.toString().padLeft(2, '0')}-"
+        "${utc.day.toString().padLeft(2, '0')}";
+  }
+}
+
 abstract class DayLogRepository {
   // Habits
   Future<List<Habit>> getHabits({required String userId});
@@ -19,6 +118,10 @@ abstract class DayLogRepository {
     required String userId,
     required DayLog log,
   });
+
+  //goals
+
+
 }
 
 class InMemoryDayLogRepository implements DayLogRepository {
@@ -126,6 +229,7 @@ class InMemoryDayLogRepository implements DayLogRepository {
       const Habit(id: 'read',  name: 'Skaitymas (min)', kind: RatingKind.number, min: 0, max: 200),
       const Habit(id: 'med',   name: 'Meditacija', kind: RatingKind.enumerator, options: ['Bad','OK','Great']),
       const Habit(id: 'mood',  name: 'Nuotaika', kind: RatingKind.scale, min: 1, max: 5),
+      const Habit(id: 'app2min', name:'2minutes', kind: RatingKind.checkbox, systemOnly: true),
     ];
 
     final now = DateTime.now().toUtc();

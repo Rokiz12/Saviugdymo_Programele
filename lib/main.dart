@@ -69,7 +69,7 @@ class _MainScreenState extends State<MainScreen>
 
     pages = [
       CollectionPage(userId: widget.userId),
-      AvatarPage(),
+      AvatarPage(userId: widget.userId),
       HabitsPage(),
       DiaryPage(),
       SettingsPage(),

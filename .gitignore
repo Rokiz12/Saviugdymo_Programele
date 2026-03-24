@@ -46,3 +46,6 @@ app.*.map.json
 
 #Firestore config
 /android/app/google-services.json
+
+#auth
+lib/services/auth_service.dart

@@ -11,7 +11,7 @@ class AuthService {
 
   static Future<User?> signInWithGoogle() async {
     await GoogleSignIn.instance.initialize(
-      serverClientId: 'aaaaaaa',
+      serverClientId: 'iveskitKODA',
     );
 
     final GoogleSignInAccount googleUser =

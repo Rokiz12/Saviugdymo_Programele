@@ -7,6 +7,7 @@ import '../data/repositories/pet_repository.dart';
 import '../data/repositories/user_repository.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CollectionPage extends StatefulWidget {
   final String userId;
@@ -304,7 +305,18 @@ class _PetCard extends StatelessWidget {
                     0,      0,      0,      1, 0,
                   ]),
                   child: imageUrl.isNotEmpty
-                      ? Image.network(imageUrl, fit: BoxFit.cover)
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        errorWidget: (context, url, error) =>
+                            Icon(Icons.pets,
+                                size: 40,
+                                color: Colors.grey.shade400),
+                      )
                       : Icon(Icons.pets,
                       size: 40, color: Colors.grey.shade400),
                 ),
@@ -470,7 +482,18 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                           0,      0,      0,      1, 0,
                         ]),
                         child: imageUrl.isNotEmpty
-                            ? Image.network(imageUrl, fit: BoxFit.cover)
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) =>
+                                  const Center(
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                              errorWidget: (context, url, error) =>
+                                  Icon(Icons.pets,
+                                      size: 40,
+                                      color: Colors.grey.shade400),
+                            )
                             : Icon(Icons.pets,
                             size: 60, color: Colors.grey.shade400),
                       ),

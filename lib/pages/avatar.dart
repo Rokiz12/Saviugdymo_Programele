@@ -4,6 +4,7 @@ import '../data/models/user_model.dart';
 import '../data/models/pet_model.dart';
 import '../data/repositories/user_repository.dart';
 import '../data/repositories/pet_repository.dart';
+import "package:cached_network_image/cached_network_image.dart";
 
 class AvatarPage extends StatefulWidget {
   final String userId;
@@ -115,7 +116,7 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
           body: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFFF6F8FF), Color(0xFFE9EEFF)],
+                colors: [Color(0xfff5e1), Color(0xfff5e1)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -159,7 +160,7 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.purpleAccent.withOpacity(0.4),
+                                  color: const Color.fromARGB(255, 170, 170, 170).withOpacity(0.4),
                                   blurRadius: 30,
                                   spreadRadius: 5,
                                   offset: const Offset(0, 10))
@@ -172,7 +173,7 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: LinearGradient(
-                                      colors: [Colors.purpleAccent, Colors.deepPurple]),
+                                      colors: [Color.fromARGB(255, 216, 215, 216), Color.fromARGB(255, 161, 161, 161)]),
                                 ),
                               ),
                               Padding(
@@ -180,8 +181,20 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                                 child: ClipOval(
                                   child: imageUrl.isEmpty
                                       ? const Icon(Icons.pets, size: 120)
-                                      : Image.network(imageUrl,
-                                          fit: BoxFit.cover, width: 220, height: 220),
+                                      : CachedNetworkImage(
+                                          imageUrl: imageUrl,
+                                          fit: BoxFit.cover,
+                                          width: 220,
+                                          height: 220,
+                                          memCacheWidth: 512,
+                                          memCacheHeight: 512,
+                                          placeholder: (context, url) =>
+                                              const Center(
+                                                child: CircularProgressIndicator(strokeWidth: 2),
+                                              ),
+                                          errorWidget: (context, url, error) =>
+                                              const Icon(Icons.pets, size: 120),
+                                        ),
                                 ),
                               ),
                             ],

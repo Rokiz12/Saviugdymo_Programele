@@ -1,4 +1,4 @@
-enum GoalPeriod {day, week, month, year}
+enum GoalPeriod {day, week, month, year, custom}
 
 class Goal {
   final String id;
@@ -6,6 +6,8 @@ class Goal {
   final String habbitID;
   final int target;
   final GoalPeriod period;
+  final int? customDays;
+  final bool repeat;
 
   const Goal({
     required this.id,
@@ -13,7 +15,10 @@ class Goal {
     required this.habbitID,
     required this.target,
     required this.period,
-});
+    this.customDays,
+    required this.repeat,
+
+  });
 
 
   Map<String, dynamic> toJson() =>{
@@ -21,7 +26,10 @@ class Goal {
     'name' : name,
     'habbitID' : habbitID,
     'target' : target,
-    'period' : period,
+    'period' : period.name,
+    'customDays': customDays,
+    'repeat': repeat,
+
   };
 
   factory Goal.fromJson(Map<String, dynamic> json) {
@@ -30,7 +38,9 @@ class Goal {
       name: json['name'],
       habbitID: json['habbitID'],
       target: json['target'],
-      period: GoalPeriod.values.firstWhere((p) => p.name == json['period'])
+      period: GoalPeriod.values.firstWhere((p) => p.name == json['period']),
+      customDays: json['customDays'],
+      repeat: json['repeat'] ?? false,
     );
   }
 }

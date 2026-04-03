@@ -13,7 +13,8 @@ class AvatarPage extends StatefulWidget {
   State<AvatarPage> createState() => _AvatarPageState();
 }
 
-class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateMixin {
+class _AvatarPageState extends State<AvatarPage>
+    with SingleTickerProviderStateMixin {
   final UserRepository _userRepository = UserRepository();
   final PetRepository _petRepository = PetRepository();
 
@@ -22,8 +23,6 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
   double _avatarScale = 1.0;
 
   late Future<(UserModel?, PetModel?)> _dataFuture;
-
-  final Random _random = Random();
 
   @override
   void initState() {
@@ -48,11 +47,6 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
     PetModel? pet;
     if (user.equippedPetId.isNotEmpty) {
       pet = await _petRepository.getPet(user.equippedPetId);
-      if (pet != null) {
-        debugPrint("Loaded pet: ${pet.name}");
-      } else {
-        debugPrint("Pet ${user.equippedPetId} not found in DB");
-      }
     }
 
     return (user, pet);
@@ -70,61 +64,69 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
 
         if (!snapshot.hasData || snapshot.data == null) {
-          return const Scaffold(body: Center(child: Text("User not found")));
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text("User not found")),
+          );
         }
 
         final (user, pet) = snapshot.data!;
-        if (user == null) return const Scaffold(body: Center(child: Text("User not found")));
+        if (user == null) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text("User not found")),
+          );
+        }
 
-        // XP, Level
         final petProgress = user.ownedPets[user.equippedPetId];
         final petXp = petProgress?.xp ?? 0;
         final petLevel = petProgress?.level ?? 1;
         final nextLevelXp = petLevel * 100;
         final progress = nextLevelXp == 0 ? 0.0 : petXp / nextLevelXp;
 
-        // Pet image
-        final mood = user.petMood;
-        String imageUrl = '';
-        if (pet != null) {
-          imageUrl = pet.images['collection'] ?? '';
-        }
-        debugPrint("pet image URL: $imageUrl");
-
-        // Pet name and rarity
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
+        final imageUrl = pet?.images['collection'] ?? '';
+        const streak = 4;
 
-        // Daily streak 
-        final streak = 4;
-
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text(
-              "Avataras",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-            centerTitle: true,
-            backgroundColor: Colors.yellow,
-            elevation: 0,
-          ),
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFF6F8FF), Color(0xFFE9EEFF)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              color: Colors.yellow,
+              child: const Center(
+                child: Text(
+                  "Avataras",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                    fontSize: 20,
+                  ),
+                ),
               ),
             ),
-            child: SingleChildScrollView(
+
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFF6F8FF), Color(0xFFE9EEFF)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
               child: Column(
                 children: [
                   const SizedBox(height: 32),
-                  // Pet name
+
                   Text(
                     petName,
                     style: const TextStyle(
@@ -133,9 +135,9 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                       color: Color(0xFF2D3142),
                     ),
                   ),
+
                   const SizedBox(height: 24),
 
-                  // Floating avatar
                   AnimatedBuilder(
                     animation: _floatingAnimation,
                     builder: (context, child) {
@@ -149,9 +151,12 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                       duration: const Duration(milliseconds: 150),
                       curve: Curves.easeOutCubic,
                       child: GestureDetector(
-                        onTapDown: (_) => setState(() => _avatarScale = 0.92),
-                        onTapUp: (_) => setState(() => _avatarScale = 1.0),
-                        onTapCancel: () => setState(() => _avatarScale = 1.0),
+                        onTapDown: (_) =>
+                            setState(() => _avatarScale = 0.92),
+                        onTapUp: (_) =>
+                            setState(() => _avatarScale = 1.0),
+                        onTapCancel: () =>
+                            setState(() => _avatarScale = 1.0),
                         child: Container(
                           width: 220,
                           height: 220,
@@ -159,10 +164,11 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.purpleAccent.withOpacity(0.4),
-                                  blurRadius: 30,
-                                  spreadRadius: 5,
-                                  offset: const Offset(0, 10))
+                                color: Colors.purpleAccent.withOpacity(0.4),
+                                blurRadius: 30,
+                                spreadRadius: 5,
+                                offset: const Offset(0, 10),
+                              )
                             ],
                           ),
                           child: Stack(
@@ -172,7 +178,11 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: LinearGradient(
-                                      colors: [Colors.purpleAccent, Colors.deepPurple]),
+                                    colors: [
+                                      Colors.purpleAccent,
+                                      Colors.deepPurple
+                                    ],
+                                  ),
                                 ),
                               ),
                               Padding(
@@ -180,8 +190,12 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                                 child: ClipOval(
                                   child: imageUrl.isEmpty
                                       ? const Icon(Icons.pets, size: 120)
-                                      : Image.network(imageUrl,
-                                          fit: BoxFit.cover, width: 220, height: 220),
+                                      : Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    width: 220,
+                                    height: 220,
+                                  ),
                                 ),
                               ),
                             ],
@@ -192,31 +206,29 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                   ),
 
                   const SizedBox(height: 24),
-                  // Rarity badge
+
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.purple.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                      border:
+                      Border.all(color: Colors.purple.withOpacity(0.3)),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          petRarity,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: Colors.purple,
-                              letterSpacing: 1.1),
-                        ),
-                      ],
+                    child: Text(
+                      petRarity,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Colors.purple,
+                        letterSpacing: 1.1,
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 36),
-                  // XP progress
+
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -226,9 +238,10 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10))
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          )
                         ],
                       ),
                       child: Column(
@@ -238,41 +251,52 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                             children: [
                               Text("Level $petLevel",
                                   style: const TextStyle(
-                                      fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF2D3142))),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF2D3142))),
                               Text("$petXp / $nextLevelXp XP",
-                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey)),
+                                  style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey)),
                             ],
                           ),
                           const SizedBox(height: 16),
                           TweenAnimationBuilder<double>(
-                            tween: Tween<double>(begin: 0, end: progress),
-                            duration: const Duration(milliseconds: 1200),
+                            tween:
+                            Tween<double>(begin: 0, end: progress),
+                            duration:
+                            const Duration(milliseconds: 1200),
                             curve: Curves.easeOutCubic,
                             builder: (context, value, child) {
-                              return LayoutBuilder(
-                                builder: (context, constraints) {
-                                  return Stack(
-                                    children: [
-                                      Container(
-                                        height: 18,
-                                        width: constraints.maxWidth,
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(10),
+                              return Stack(
+                                children: [
+                                  Container(
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius:
+                                      BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  FractionallySizedBox(
+                                    widthFactor: value,
+                                    child: Container(
+                                      height: 18,
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                        BorderRadius.circular(10),
+                                        gradient:
+                                        const LinearGradient(
+                                          colors: [
+                                            Colors.orangeAccent,
+                                            Colors.deepOrange
+                                          ],
                                         ),
                                       ),
-                                      Container(
-                                        height: 18,
-                                        width: constraints.maxWidth * value,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(10),
-                                          gradient: const LinearGradient(
-                                              colors: [Colors.orangeAccent, Colors.deepOrange]),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -282,7 +306,7 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                   ),
 
                   const SizedBox(height: 20),
-                  // Streak, total XP stats
+
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -309,11 +333,12 @@ class _AvatarPageState extends State<AvatarPage> with SingleTickerProviderStateM
                       ],
                     ),
                   ),
+
                   const SizedBox(height: 40),
                 ],
               ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -342,7 +367,13 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
+        ],
       ),
       child: Column(
         children: [
@@ -352,9 +383,17 @@ class _StatCard extends StatelessWidget {
             child: Icon(icon, size: 28, color: iconColor),
           ),
           const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF2D3142))),
+          Text(value,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  color: Color(0xFF2D3142))),
           const SizedBox(height: 4),
-          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey)),
         ],
       ),
     );

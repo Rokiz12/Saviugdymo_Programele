@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
+import 'pages/combined_avatar_and_collection.dart';
 import 'pages/avatar.dart';
 import 'pages/diary.dart';
 import 'pages/habits.dart';
@@ -68,8 +69,7 @@ class _MainScreenState extends State<MainScreen>
     super.initState();
 
     pages = [
-      CollectionPage(userId: widget.userId),
-      AvatarPage(userId: widget.userId),
+      CombinedAvatarAndCollectionPage(userId: widget.userId),
       HabitsPage(),
       DiaryPage(),
       SettingsPage(),
@@ -135,8 +135,8 @@ class _MainScreenState extends State<MainScreen>
         onTap: onItemTapped,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.pets), label: "Kolekcija"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Avataras"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Statistikos"),
           BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Nustatymai"),

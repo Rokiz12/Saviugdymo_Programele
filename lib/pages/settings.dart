@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'questionaire.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -112,6 +113,20 @@ class SettingsPage extends StatelessWidget {
           _SettingsCard(
             title: "Paskyra",
             children: [
+              _SettingsTile(
+                icon: Icons.quiz,
+                iconColor: Colors.red,
+                title: "Perdaryti norų klausimyną",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const QuestionnaireScreen(),
+                    ),
+                  );
+                },
+              ),
+
               _SettingsTile(
                 icon: Icons.logout,
                 iconColor: Colors.red,

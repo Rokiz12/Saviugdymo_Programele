@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -11,8 +12,7 @@ class DiaryPage extends StatefulWidget {
 
 class _DiaryPageState extends State<DiaryPage> {
   final DiaryRepository _repository = DiaryRepository();
-  final String _userId = "test_user_123";
-
+  final String _userId = FirebaseAuth.instance.currentUser!.uid;
   // Calendar
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDay;

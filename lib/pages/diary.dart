@@ -3,6 +3,7 @@ import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/custom_app_bar.dart';
+import '../data/repositories/user_repository.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -57,6 +58,8 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Future<void> _saveEntry() async {
+    final now = DateTime.now();
+
     if (selectedMood.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Pasirink nuotaiką!")),
@@ -64,7 +67,6 @@ class _DiaryPageState extends State<DiaryPage> {
       return;
     }
 
-    final now = DateTime.now();
     final preview = textControllers[0].text.isNotEmpty
         ? textControllers[0].text
         : (textControllers[3].text.isNotEmpty ? textControllers[3].text : "Tuščias įrašas");
@@ -86,6 +88,16 @@ class _DiaryPageState extends State<DiaryPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Įrašas išsaugotas!"), backgroundColor: Colors.green),
+      );
+    }
+
+    final userRepo = UserRepository();
+
+    final gotXp = await userRepo.tryGiveDiaryXp(_userId, 10);
+
+    if (gotXp) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Gavai +10 XP!")),
       );
     }
   }

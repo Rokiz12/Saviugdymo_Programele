@@ -37,6 +37,29 @@ class UserRepository {
     });
   }
 
+  /// increase userxp
+  Future<({int oldLevel, int newLevel})> addUserXp(String userId, int xpToAdd) async {
+    int oldLevel = 0;
+    int newLevel = 0;
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(_users.doc(userId));
+      final data = snap.data() as Map<String, dynamic>;
+
+      oldLevel = data['level'] as int;
+      final newXp = (data['xp'] as int) + xpToAdd;
+      newLevel = (newXp / 100).floor() + 1;
+
+      tx.update(_users.doc(userId), {
+        'xp': newXp,
+        'level': newLevel,
+      });
+    });
+
+    return (oldLevel: oldLevel, newLevel: newLevel);
+  }
+
+  /// increase pet xp
   Future<void> addPetXp(String userId, String petId, int xpToAdd) async {
     final user = await getUser(userId);
     if (user == null) return;
@@ -53,6 +76,7 @@ class UserRepository {
     });
   }
 
+  /// change pet mood
   Future<void> updatePetMood(String userId, String mood) async {
     await _users.doc(userId).update({'petMood': mood});
   }

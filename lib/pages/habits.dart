@@ -1,147 +1,10 @@
-// lib/pages/habits.dart
 import 'package:flutter/material.dart';
+import 'package:pvp/features/habits/data/HabitRepository.dart';
+import 'package:pvp/features/habits/data/foreground_time_tracker.dart';
 import 'package:pvp/features/habits/models/models.dart';
-import 'package:pvp/features/habits/data/dayLogRepository.dart';
-
-// You can keep this in the same file as the page for now.
-class HabitEditorDialog extends StatefulWidget {
-  const HabitEditorDialog({super.key, this.initial});
-  final Habit? initial;
-
-  @override
-  State<HabitEditorDialog> createState() => _HabitEditorDialogState();
-}
-
-class _HabitEditorDialogState extends State<HabitEditorDialog> {
-  final _nameCtrl = TextEditingController();
-  RatingKind _kind = RatingKind.checkbox;
-  final _minCtrl = TextEditingController();
-  final _maxCtrl = TextEditingController();
-  final _optionsCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    final h = widget.initial;
-    if (h != null) {
-      _nameCtrl.text = h.name;
-      _kind = h.kind;
-      if (h.min != null) _minCtrl.text = '${h.min}';
-      if (h.max != null) _maxCtrl.text = '${h.max}';
-      if (h.options != null && h.options!.isNotEmpty) {
-        _optionsCtrl.text = h.options!.join(', ');
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _minCtrl.dispose();
-    _maxCtrl.dispose();
-    _optionsCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isEdit = widget.initial != null;
-    return AlertDialog(
-      title: Text(isEdit ? 'Redaguoti įprotį' : 'Naujas įprotis'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Pavadinimas'),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<RatingKind>(
-              value: _kind,
-              decoration: const InputDecoration(labelText: 'Tipas'),
-              items: RatingKind.values.map((k) {
-                return DropdownMenuItem(
-                  value: k,
-                  child: Text(switch (k) {
-                    RatingKind.checkbox     => 'Pažyma (✔/✖)',
-                    RatingKind.number       => 'Skaičius',
-                    RatingKind.scale        => 'Skalė',
-                    RatingKind.enumerator  => 'Kategorija',
-                  }),
-                );
-              }).toList(),
-              onChanged: (k) => setState(() => _kind = k ?? RatingKind.checkbox),
-            ),
-            if (_kind == RatingKind.number || _kind == RatingKind.scale) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _minCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Min'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _maxCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Max'),
-              ),
-            ],
-            if (_kind == RatingKind.enumerator) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _optionsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Parinktys (atskirti kableliais)',
-                  hintText: 'pvz.: Bad, OK, Great',
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Atšaukti')),
-        TextButton(
-          onPressed: () {
-            final name = _nameCtrl.text.trim();
-            if (name.isEmpty) return;
-
-            int? min = int.tryParse(_minCtrl.text.trim());
-            int? max = int.tryParse(_maxCtrl.text.trim());
-            if (!(_kind == RatingKind.number || _kind == RatingKind.scale)) {
-              min = null; max = null;
-            }
-            List<String>? opts;
-            if (_kind == RatingKind.enumerator) {
-              final raw = _optionsCtrl.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-              opts = raw.isEmpty ? null : raw;
-            }
-
-            final id = widget.initial?.id ?? _newHabitId(name);
-            final habit = Habit(
-              id: id,
-              name: name,
-              kind: _kind,
-              min: min,
-              max: max,
-              options: opts,
-            );
-            Navigator.pop(context, habit);
-          },
-          child: Text(widget.initial == null ? 'Pridėti' : 'Išsaugoti'),
-        ),
-      ],
-    );
-  }
-
-  String _newHabitId(String name) {
-    // Quick ID: slug + timestamp (replace with proper UUID later)
-    final slug = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'-+'), '-');
-    return '$slug-${DateTime.now().millisecondsSinceEpoch}';
-  }
-}
-
+import 'package:pvp/features/habits/utils/goalProgress.dart';
+import 'package:pvp/features/habits/dialogs/habitEditorDialog.dart';
+import 'package:pvp/features/habits/dialogs/goalEditDialog.dart';
 
 class HabitsPage extends StatefulWidget {
   const HabitsPage({super.key});
@@ -151,51 +14,114 @@ class HabitsPage extends StatefulWidget {
 }
 
 class _HabitsPageState extends State<HabitsPage> {
-  final _repo = InMemoryDayLogRepository(); // swap later for real DB repo
-  final _userId = 'demo_user';
+  final _repo = FirebaseDayLogRepository();
+  final String _userId = "Z7eXTV0WWQSeCrWrqbf0MQMEpBf2";
 
   List<Habit> _habits = [];
+  List<Goal> _goals = [];
+  List<DayLog> _monthLogs = [];
   DayLog? _today;
+
+  ForegroundTimeTracker? _tracker;
+
+  // INIT
 
   @override
   void initState() {
     super.initState();
-    _loadInitial();
+    _initialize();
   }
+
+  Future<void> _initialize() async {
+    await _loadInitial();
+    await _ensureAutoHabitExists();
+    _startTracker();
+  }
+
+  // DATA LOAD
 
   Future<void> _loadInitial() async {
     final habits = await _repo.getHabits(userId: _userId);
+    final goals = await _repo.getGoals(userId: _userId);
 
     final now = DateTime.now().toUtc();
     final start = DateTime.utc(now.year, now.month, 1);
-    final end   = DateTime.utc(now.year, now.month + 1, 0);
+    final end = DateTime.utc(now.year, now.month + 1, 0);
+
     final monthLogs = await _repo.getLogsForRange(
-      userId: _userId, startInclusive: start, endInclusive: end,
+      userId: _userId,
+      startInclusive: start,
+      endInclusive: end,
     );
 
-    DayLog? today = monthLogs.firstWhere(
-          (l) => l.dateUtc.year == now.year && l.dateUtc.month == now.month && l.dateUtc.day == now.day,
-      orElse: () => DayLog(dateUtc: DateTime.utc(now.year, now.month, now.day), entries: {}),
+    DayLog today = monthLogs.firstWhere(
+          (log) =>
+      log.dateUtc.year == now.year &&
+          log.dateUtc.month == now.month &&
+          log.dateUtc.day == now.day,
+      orElse: () =>
+          DayLog(dateUtc: DateTime.utc(now.year, now.month, now.day), entries: {}),
     );
 
     setState(() {
       _habits = habits;
-      _today  = today;
+      _goals = goals;
+      _today = today;
+      _monthLogs = monthLogs;
     });
   }
 
-  Future<void> _saveToday() async {
-    if (_today != null) {
-      await _repo.upsertDayLog(userId: _userId, log: _today!);
+  // GOAL PROGRESS CALCULATION
+
+  int _calculateGoalProgress(Goal g) {
+    final habitId = g.habbitID;
+    final habit = _habits.firstWhere(
+          (h) => h.id == habitId,
+      orElse: () => Habit(id: "missing", name: "Missing", kind: RatingKind.checkbox),
+    );
+
+    switch (g.period) {
+      case GoalPeriod.day:
+        return goalValueOf(_today?.entries[habitId], habit);
+
+      case GoalPeriod.week:
+        return _monthLogs
+            .where((log) => _isInCurrentWeek(log.dateUtc))
+            .map((log) => goalValueOf(log.entries[habitId], habit))
+            .fold(0, (a, b) => a + b);
+
+      case GoalPeriod.month:
+        return _monthLogs
+            .map((log) => goalValueOf(log.entries[habitId], habit))
+            .fold(0, (a, b) => a + b);
+
+      case GoalPeriod.year:
+        return _monthLogs
+            .map((log) => goalValueOf(log.entries[habitId], habit))
+            .fold(0, (a, b) => a + b);
+
+      case GoalPeriod.custom:
+        final days = g.customDays ?? 1;
+        final now = DateTime.now().toUtc();
+        final start = now.subtract(Duration(days: days));
+
+        return _monthLogs
+            .where((log) => log.dateUtc.isAfter(start))
+            .map((log) => goalValueOf(log.entries[habitId], habit))
+            .fold(0, (a, b) => a + b);
     }
   }
 
-  void _setValue(Habit h, RatingValue v) {
-    setState(() {
-      _today = (_today ?? DayLog(dateUtc: DateTime.now().toUtc(), entries: {})).setValue(h.id, v);
-    });
-    _saveToday();
+  bool _isInCurrentWeek(DateTime d) {
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final sunday = monday.add(const Duration(days: 6));
+
+    return d.isAfter(monday.subtract(const Duration(days: 1))) &&
+        d.isBefore(sunday.add(const Duration(days: 1)));
   }
+
+  // HABITS CRUD
 
   Future<void> _addHabit() async {
     final habit = await showDialog<Habit>(
@@ -205,13 +131,11 @@ class _HabitsPageState extends State<HabitsPage> {
     if (habit == null) return;
 
     await _repo.addHabit(userId: _userId, habit: habit);
-    setState(() => _habits = [..._habits, habit]);
 
-    // Optionally set an initial value for today
+    setState(() => _habits.add(habit));
+
     final initVal = _initialValueFor(habit);
-    if (initVal != null) {
-      _setValue(habit, initVal);
-    }
+    if (initVal != null) _setValue(habit, initVal);
   }
 
   Future<void> _editHabit(Habit h) async {
@@ -222,72 +146,137 @@ class _HabitsPageState extends State<HabitsPage> {
     if (updated == null) return;
 
     await _repo.updateHabit(userId: _userId, habit: updated);
+
     setState(() {
       final i = _habits.indexWhere((x) => x.id == updated.id);
       if (i >= 0) _habits[i] = updated;
     });
 
-    // If kind changed, you may want to reset today's value to a compatible default
     if (_today?.entries[updated.id] case final v?) {
-      final compatible = _coerceValueIfNeeded(updated, v);
-      if (compatible != v) {
-        _setValue(updated, compatible ?? _initialValueFor(updated) ?? v);
-      }
+      final coerced = _coerceValueIfNeeded(updated, v);
+      if (coerced != v) _setValue(updated, coerced ?? v);
     }
   }
 
   Future<void> _deleteHabit(Habit h) async {
+    if (h.systemOnly) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Ištrinti įprotį?'),
+        title: const Text("Ištrinti įprotį?"),
         content: Text("Ar tikrai norite ištrinti '${h.name}'?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Ne')),
-          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text('Taip')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Ne")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Taip")),
         ],
       ),
     );
+
     if (confirm != true) return;
 
-    await _repo.deleteHabit(userId: _userId, habitId: h.id, cascadeDeleteValues: true);
+    await _repo.deleteHabit(userId: _userId, habitId: h.id);
 
     setState(() {
       _habits.removeWhere((x) => x.id == h.id);
-      if (_today != null && _today!.entries.containsKey(h.id)) {
-        _today = _today!.removeValue(h.id);
-      }
+      _today = _today?.removeValue(h.id);
     });
   }
 
+  // GOALS CRUD
+
+  Future<void> _addGoal() async {
+    final goal = await showDialog<Goal>(
+      context: context,
+      builder: (_) => GoalEditorDialog(
+        habits: _habits,
+      ),
+    );
+
+    if (goal == null) return;
+
+    await _repo.addGoal(userId: _userId, goal: goal);
+
+    setState(() => _goals.add(goal));
+  }
+
+  Future<void> _editGoal(Goal g) async {
+    final updated = await showDialog<Goal>(
+      context: context,
+      builder: (_) => GoalEditorDialog(
+        habits: _habits,
+        initial: g,
+      ),
+    );
+
+    if (updated == null) return;
+
+    await _repo.updateGoal(userId: _userId, goal: updated);
+
+    setState(() {
+      final i = _goals.indexWhere((x) => x.id == updated.id);
+      if (i >= 0) _goals[i] = updated;
+    });
+  }
+
+  Future<void> _deleteGoal(Goal g) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Ištrinti tikslą?"),
+        content: Text("Ar tikrai norite ištrinti '${g.name}'?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Ne")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Taip")),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await _repo.deleteGoal(userId: _userId, goalId: g.id);
+
+    setState(() => _goals.removeWhere((x) => x.id == g.id));
+  }
+
+  // HABIT VALUE HANDLING
+
   RatingValue? _initialValueFor(Habit h) {
     switch (h.kind) {
-      case RatingKind.checkbox:     return const BoolValue(false);
-      case RatingKind.number:       return NumberValue(h.min ?? 0);
-      case RatingKind.scale:        return NumberValue((h.min ?? 1));
-      case RatingKind.enumerator:  return (h.options?.isNotEmpty ?? false) ? EnumValue(h.options!.first) : null;
+      case RatingKind.checkbox:
+        return const BoolValue(false);
+      case RatingKind.number:
+        return NumberValue(h.min ?? 0);
+      case RatingKind.scale:
+        return NumberValue(h.min ?? 1);
+      case RatingKind.enumerator:
+        return h.options != null && h.options!.isNotEmpty
+            ? EnumValue(h.options!.first)
+            : null;
     }
   }
 
   RatingValue? _coerceValueIfNeeded(Habit h, RatingValue v) {
     switch (h.kind) {
       case RatingKind.checkbox:
-        return (v is BoolValue) ? v : const BoolValue(false);
+        return v is BoolValue ? v : const BoolValue(false);
+
       case RatingKind.number:
         if (v is NumberValue) {
-          final min = (h.min ?? -0x7fffffff);
-          final max = (h.max ??  0x7fffffff);
-          final clamped = v.value.clamp(min, max);
-          return NumberValue(clamped);
+          final min = h.min ?? -999999;
+          final max = h.max ?? 999999;
+          return NumberValue(v.value.clamp(min, max));
         }
         return NumberValue(h.min ?? 0);
+
       case RatingKind.scale:
-        final min = (h.min ?? 1), max = (h.max ?? 5);
+        final min = h.min ?? 1;
+        final max = h.max ?? 5;
         if (v is NumberValue) {
-          final clamped = v.value.clamp(min, max);
-          return NumberValue(clamped);
+          return NumberValue(v.value.clamp(min, max));
         }
         return NumberValue(min);
+
       case RatingKind.enumerator:
         final opts = h.options ?? const [];
         if (v is EnumValue && opts.contains(v.option)) return v;
@@ -295,165 +284,303 @@ class _HabitsPageState extends State<HabitsPage> {
     }
   }
 
+  void _setValue(Habit h, RatingValue v) {
+    final newLog = (_today ??
+        DayLog(
+          dateUtc: DateTime.now().toUtc(),
+          entries: {},
+        ))
+        .setValue(h.id, v);
+
+    setState(() => _today = newLog);
+
+    _repo.upsertDayLog(userId: _userId, log: newLog);
+  }
+
+  // AUTO HABIT TRACKER
+
+  Future<void> _ensureAutoHabitExists() async {
+    const auto = Habit(
+      id: 'app2min',
+      name: '2minutes',
+      kind: RatingKind.checkbox,
+      systemOnly: true,
+    );
+
+    if (!_habits.any((h) => h.id == auto.id)) {
+      await _repo.addHabit(userId: _userId, habit: auto);
+      setState(() => _habits.add(auto));
+    }
+  }
+
+  void _startTracker() {
+    _tracker = ForegroundTimeTracker(
+      threshold: const Duration(minutes: 2),
+      onReached: (day) async {
+        DayLog log = _today ??
+            DayLog(dateUtc: day, entries: {});
+
+        if (log.dateUtc.year != day.year ||
+            log.dateUtc.month != day.month ||
+            log.dateUtc.day != day.day) {
+          log = DayLog(dateUtc: day, entries: {});
+        }
+
+        log = log.setValue('app2min', const BoolValue(true));
+
+        await _repo.upsertDayLog(userId: _userId, log: log);
+
+        final now = DateTime.now().toUtc();
+        if (day.year == now.year && day.month == now.month && day.day == now.day) {
+          setState(() => _today = log);
+        }
+      },
+    )..start();
+  }
+
+  @override
+  void dispose() {
+    _tracker?.stop();
+    super.dispose();
+  }
+
+  // UI
+
   @override
   Widget build(BuildContext context) {
-    final today = _today;
+    if (_today == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Įpročiai'),
+        title: const Text("Įpročiai"),
         backgroundColor: Colors.yellow,
         centerTitle: true,
       ),
-      body: (today == null)
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // ----------------- HABITS BOX (same look & feel) -----------------
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                children: [
-                  ListView.separated(
-                    separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.black12),
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _habits.length,
-                    itemBuilder: (context, index) {
-                      final h = _habits[index];
-                      final v = today.entries[h.id];
-
-                      return SizedBox(
-                        height: 44, // compact row, keeps font size
-                        child: ListTile(
-                          dense: true,
-                          minVerticalPadding: 0,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                          visualDensity: const VisualDensity(vertical: -1),
-                          title: Text(h.name, style: const TextStyle(fontSize: 16)),
-                          // Tap = edit, hold = delete
-                          onTap: () => _editHabit(h),
-                          onLongPress: () => _deleteHabit(h),
-                          trailing: _buildTrailingFor(h, v),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: Colors.black),
-                  TextButton.icon(
-                    onPressed: _addHabit,
-                    icon: const Icon(Icons.add, color: Colors.black),
-                    label: const Text("Pridėti įprotį", style: TextStyle(color: Colors.black)),
-                  ),
-                ],
-              ),
-            ),
-
-            // placeholders
-            const SizedBox(height: 30),
-
-            Container( // months or week table
-              height: 150,
-              width: 450,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(child: Text("Month or weeks table")),
-            ),
+            // HABITS TABLE
+            _buildHabitsSection(),
 
             const SizedBox(height: 30),
 
-            Container( // goals table
-              height: 150,
-              width: 450,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(child: Text("Goals Table")),
-            ),
+            _buildMonthPlaceholder(),
+
+            const SizedBox(height: 30),
+
+            // GOALS TABLE
+            _buildGoalsSection(),
           ],
         ),
       ),
     );
   }
 
-  // Trailing control rendered by Habit.kind, writes DayLog on change
+  // UI SUBWIDGETS
+
+  Widget _buildHabitsSection() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          ListView.separated(
+            separatorBuilder: (_, __) =>
+            const Divider(height: 1, color: Colors.black12),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _habits.length,
+            itemBuilder: (context, index) {
+              final h = _habits[index];
+              final v = _today!.entries[h.id];
+
+              return SizedBox(
+                height: 44,
+                child: ListTile(
+                  dense: true,
+                  minVerticalPadding: 0,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  visualDensity: const VisualDensity(vertical: -1),
+
+                  title: Text(h.name, style: const TextStyle(fontSize: 16)),
+
+                  onTap: h.systemOnly ? null : () => _editHabit(h),
+                  onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
+
+                  trailing: _buildTrailingFor(h, v),
+                ),
+              );
+            },
+          ),
+
+          const Divider(height: 1, color: Colors.black),
+
+          TextButton.icon(
+            onPressed: _addHabit,
+            icon: const Icon(Icons.add, color: Colors.black),
+            label: const Text("Pridėti įprotį", style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthPlaceholder() {
+    return Container(
+      height: 150,
+      width: 450,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Center(
+        child: Text("Month or weeks table placeholder"),
+      ),
+    );
+  }
+
+  Widget _buildGoalsSection() {
+    return Container(
+      width: 450,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _goals.length,
+            itemBuilder: (context, index) {
+              final g = _goals[index];
+              final progress = _calculateGoalProgress(g);
+              double percent = (progress / g.target).clamp(0, 1.0);
+
+              return ListTile(
+                title: Text(g.name),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("$progress / ${g.target}"),
+                    const SizedBox(height: 6),
+                    LinearProgressIndicator(
+                      value: percent,
+                      backgroundColor: Colors.grey[300],
+                      color: percent >= 1 ? Colors.green : Colors.blue,
+                    ),
+                  ],
+                ),
+                trailing: Text("${(percent * 100).round()}%"),
+                onTap: () => _editGoal(g),
+                onLongPress: () => _deleteGoal(g),
+              );
+            },
+          ),
+
+          const Divider(height: 1),
+
+          TextButton.icon(
+            onPressed: _addGoal,
+            icon: const Icon(Icons.add, color: Colors.black),
+            label: const Text("Pridėti Tikslą", style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // HABIT TRAILING WIDGET
+  // ---------------------------------------------------------------------------
+
   Widget _buildTrailingFor(Habit h, RatingValue? v) {
     switch (h.kind) {
       case RatingKind.checkbox:
         final checked = (v is BoolValue) ? v.value : false;
+
+        if (h.systemOnly) {
+          return IgnorePointer(
+            child: Checkbox(
+              value: checked,
+              onChanged: null,
+            ),
+          );
+        }
+
         return Checkbox(
           value: checked,
           onChanged: (val) => _setValue(h, BoolValue(val ?? false)),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         );
 
       case RatingKind.number:
         final numVal = (v is NumberValue) ? v.value : (h.min ?? 0);
+
         return SizedBox(
           width: 96,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
-                visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.remove),
-                onPressed: () {
-                  final next = (numVal - 5).clamp(h.min ?? -999999, h.max ?? 999999);
-                  _setValue(h, NumberValue(next));
-                },
+                onPressed: () => _setValue(
+                  h,
+                  NumberValue((numVal - 5).clamp(h.min ?? -999999, h.max ?? 999999)),
+                ),
               ),
-              Text('$numVal', style: const TextStyle(fontSize: 16)),
+              Text("$numVal"),
               IconButton(
-                visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.add),
-                onPressed: () {
-                  final next = (numVal + 5).clamp(h.min ?? -999999, h.max ?? 999999);
-                  _setValue(h, NumberValue(next));
-                },
+                onPressed: () => _setValue(
+                  h,
+                  NumberValue((numVal + 5).clamp(h.min ?? -999999, h.max ?? 999999)),
+                ),
               ),
             ],
           ),
         );
 
       case RatingKind.scale:
-        final min = h.min ?? 1, max = h.max ?? 5;
+        final min = h.min ?? 1;
+        final max = h.max ?? 5;
         final current = (v is NumberValue) ? v.value.toDouble() : min.toDouble();
+
         return SizedBox(
           width: 160,
           child: Row(
             children: [
-              Text('$min'),
+              Text("$min"),
               Expanded(
                 child: Slider(
                   min: min.toDouble(),
                   max: max.toDouble(),
-                  divisions: (max - min),
+                  divisions: max - min,
                   value: current.clamp(min.toDouble(), max.toDouble()),
                   onChanged: (val) => _setValue(h, NumberValue(val.round())),
                 ),
               ),
-              Text('$max'),
+              Text("$max"),
             ],
           ),
         );
 
       case RatingKind.enumerator:
-        final options = h.options ?? const ['Bad', 'OK', 'Great'];
+        final options = h.options ?? const ["A", "B", "C"];
         final selected = (v is EnumValue) ? v.option : null;
+
         return DropdownButton<String>(
-          value: (selected != null && options.contains(selected)) ? selected : null,
-          hint: const Text('Pasirinkti'),
+          value: options.contains(selected) ? selected : null,
+          hint: const Text("Pasirinkti"),
           items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
           onChanged: (val) {
-            if (val == null) return;
-            _setValue(h, EnumValue(val));
+            if (val != null) _setValue(h, EnumValue(val));
           },
         );
     }

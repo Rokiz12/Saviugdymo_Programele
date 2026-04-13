@@ -9,6 +9,7 @@ class UserModel {
   final int coins;
   final DateTime createdAt;
   final String equippedPetId;
+  final DateTime lastDailyReward;
   final Map<String, UserPetProgress> ownedPets;
   final String petMood;
 
@@ -20,9 +21,10 @@ class UserModel {
     this.coins = 0,
     required this.createdAt,
     this.equippedPetId = '',
+    DateTime? lastDailyReward,
     this.ownedPets = const {},
     this.petMood = 'happy',
-  });
+  }) : lastDailyReward = lastDailyReward ?? DateTime(2000, 1, 1);
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
     return UserModel(
@@ -33,6 +35,9 @@ class UserModel {
       coins: map['coins'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       equippedPetId: map['equippedPetId'] ?? '',
+      lastDailyReward: map['lastDailyReward'] != null
+          ? (map['lastDailyReward'] as Timestamp).toDate()
+          : null,
       ownedPets: (map['ownedPets'] as Map<String, dynamic>? ?? {}).map(
             (petId, data) => MapEntry(
           petId,
@@ -51,6 +56,7 @@ class UserModel {
       'coins': coins,
       'createdAt': createdAt,
       'equippedPetId': equippedPetId,
+      'lastDailyReward': lastDailyReward,
       'ownedPets': ownedPets.map((petId, progress) => MapEntry(petId, progress.toMap())),
       'petMood': petMood,
     };

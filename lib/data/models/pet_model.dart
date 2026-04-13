@@ -18,7 +18,7 @@ class PetModel {
     return PetModel(
       id: id,
       name: map['name'] ?? '',
-      rarity: map['rarity'] ?? 'common',
+      rarity: map['rarity'] ?? 'Common',
       images: Map<String, String>.from(map['images'] ?? {}),
       lore: Map<String, String>.from(map['lore'] ?? {})
     );

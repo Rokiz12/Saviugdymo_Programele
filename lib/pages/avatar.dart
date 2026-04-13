@@ -1,204 +1,400 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import '../data/models/user_model.dart';
+import '../data/models/pet_model.dart';
+import '../data/repositories/user_repository.dart';
+import '../data/repositories/pet_repository.dart';
 
-// mock avatar model
-class CollectibleAvatar {
-  final String title;
-  final String imageUrl;
-  final int xp;
-  final int level;
+class AvatarPage extends StatefulWidget {
+  final String userId;
+  const AvatarPage({super.key, required this.userId});
 
-  CollectibleAvatar({
-    required this.title,
-    required this.imageUrl,
-    required this.xp,
-    required this.level,
-  });
+  @override
+  State<AvatarPage> createState() => _AvatarPageState();
 }
 
-// mock player stats model
-class PlayerStats {
-  final int coins;
-  final int dailyStreak;
+class _AvatarPageState extends State<AvatarPage>
+    with SingleTickerProviderStateMixin {
+  final UserRepository _userRepository = UserRepository();
+  final PetRepository _petRepository = PetRepository();
 
-  PlayerStats({
-    required this.coins,
-    required this.dailyStreak,
-  });
-}
+  late AnimationController _floatingController;
+  late Animation<double> _floatingAnimation;
+  double _avatarScale = 1.0;
 
-// mock data
-final CollectibleAvatar mockAvatar = CollectibleAvatar(
-  title: 'Squid',
-  imageUrl: 'https://i.imgur.com/P4oM7W3.png',
-  xp: 71,
-  level: 2,
-);
+  late Future<(UserModel?, PetModel?)> _dataFuture;
 
-final PlayerStats mockStats = PlayerStats(
-  coins: 120,
-  dailyStreak: 7,
-);
+  @override
+  void initState() {
+    super.initState();
 
-class AvatarPage extends StatelessWidget {
-  const AvatarPage({super.key});
+    _floatingController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+
+    _floatingAnimation = Tween<double>(begin: -3.0, end: 3.0).animate(
+      CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
+    );
+
+    _dataFuture = _fetchData();
+  }
+
+  Future<(UserModel?, PetModel?)> _fetchData() async {
+    final user = await _userRepository.getUser(widget.userId);
+    if (user == null) return (null, null);
+
+    PetModel? pet;
+    if (user.equippedPetId.isNotEmpty) {
+      pet = await _petRepository.getPet(user.equippedPetId);
+    }
+
+    return (user, pet);
+  }
+
+  @override
+  void dispose() {
+    _floatingController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final CollectibleAvatar avatar = mockAvatar;
-    final PlayerStats stats = mockStats;
+    return FutureBuilder<(UserModel?, PetModel?)>(
+      future: _dataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Avataras',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.yellow,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Text(
-                avatar.title,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text("User not found")),
+          );
+        }
 
-              // avatar image placeholder
-              Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.yellow, 
-                    width: 3, 
+        final (user, pet) = snapshot.data!;
+        if (user == null) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text("User not found")),
+          );
+        }
+
+        final petProgress = user.ownedPets[user.equippedPetId];
+        final petXp = petProgress?.xp ?? 0;
+        final petLevel = petProgress?.level ?? 1;
+        final nextLevelXp = petLevel * 100;
+        final progress = nextLevelXp == 0 ? 0.0 : petXp / nextLevelXp;
+
+        final petName = pet?.name ?? "No Pet";
+        final petRarity = pet?.rarity ?? "Common";
+        final imageUrl = pet?.images['collection'] ?? '';
+        const streak = 4;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              color: Colors.yellow,
+              child: const Center(
+                child: Text(
+                  "Avataras",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                    fontSize: 20,
                   ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    avatar.imageUrl,
-                    fit: BoxFit.cover,
-                  ),
+              ),
+            ),
+
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFF6F8FF), Color(0xFFE9EEFF)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 32),
 
-              const SizedBox(height: 14),
-
-
-              // rarity indicator  
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(1, (index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.star, size: 24, color: Colors.white),
+                  Text(
+                    petName,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF2D3142),
                     ),
-                  );
-                }),
-              ),
+                  ),
 
-              const SizedBox(height: 14),
+                  const SizedBox(height: 24),
 
-              // xp and level info
-              SizedBox(
-                height: 120,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.bar_chart),
-                              const SizedBox(height: 8),
-                              Text('Level: ${avatar.level}',
-                                  style: const TextStyle(fontSize: 16)),
+                  AnimatedBuilder(
+                    animation: _floatingAnimation,
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: Offset(0, _floatingAnimation.value),
+                        child: child,
+                      );
+                    },
+                    child: AnimatedScale(
+                      scale: _avatarScale,
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOutCubic,
+                      child: GestureDetector(
+                        onTapDown: (_) =>
+                            setState(() => _avatarScale = 0.92),
+                        onTapUp: (_) =>
+                            setState(() => _avatarScale = 1.0),
+                        onTapCancel: () =>
+                            setState(() => _avatarScale = 1.0),
+                        child: Container(
+                          width: 220,
+                          height: 220,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.purpleAccent.withOpacity(0.4),
+                                blurRadius: 30,
+                                spreadRadius: 5,
+                                offset: const Offset(0, 10),
+                              )
                             ],
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 16.0, horizontal: 8.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Stack(
+                            alignment: Alignment.center,
                             children: [
-                              const Icon(Icons.show_chart),
-                              const SizedBox(height: 8),
-                              Text('XP: ${avatar.xp}',
-                                  style: const TextStyle(fontSize: 16)),
-                              const SizedBox(height: 8),
-                              LinearProgressIndicator(
-                                value: (avatar.xp % 100) / 100,
-                                minHeight: 6,
+                              Container(
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.purpleAccent,
+                                      Colors.deepPurple
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 4),
+                              Padding(
+                                padding: const EdgeInsets.all(6.0),
+                                child: ClipOval(
+                                  child: imageUrl.isEmpty
+                                      ? const Icon(Icons.pets, size: 120)
+                                      : Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    width: 220,
+                                    height: 220,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
+                  const SizedBox(height: 24),
 
-              // coins
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.monetization_on),
-                        title: Text('Coins: ${stats.coins}'),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border:
+                      Border.all(color: Colors.purple.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      petRarity,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Colors.purple,
+                        letterSpacing: 1.1,
                       ),
                     ),
                   ),
-                  
-                ],
-              ),
 
-              // daily streak
-              Row(
-                children: [
-                 Expanded(
-                    child: Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.whatshot),
-                        title: Text('Daily Streak: ${stats.dailyStreak} days'),
+                  const SizedBox(height: 36),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          )
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("Level $petLevel",
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF2D3142))),
+                              Text("$petXp / $nextLevelXp XP",
+                                  style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey)),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TweenAnimationBuilder<double>(
+                            tween:
+                            Tween<double>(begin: 0, end: progress),
+                            duration:
+                            const Duration(milliseconds: 1200),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return Stack(
+                                children: [
+                                  Container(
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius:
+                                      BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  FractionallySizedBox(
+                                    widthFactor: value,
+                                    child: Container(
+                                      height: 18,
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                        BorderRadius.circular(10),
+                                        gradient:
+                                        const LinearGradient(
+                                          colors: [
+                                            Colors.orangeAccent,
+                                            Colors.deepOrange
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                  ),              
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            title: "Daily Streak",
+                            value: "$streak d.",
+                            icon: Icons.local_fire_department_rounded,
+                            iconColor: Colors.deepOrange,
+                            bgColor: Colors.deepOrange.shade50,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _StatCard(
+                            title: "Total XP",
+                            value: petXp.toString(),
+                            icon: Icons.star_rounded,
+                            iconColor: Colors.blue,
+                            bgColor: Colors.blue.shade50,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
                 ],
               ),
-            ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color iconColor;
+  final Color bgColor;
+
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+    required this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+            child: Icon(icon, size: 28, color: iconColor),
           ),
-        ),
+          const SizedBox(height: 12),
+          Text(value,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  color: Color(0xFF2D3142))),
+          const SizedBox(height: 4),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey)),
+        ],
       ),
     );
   }

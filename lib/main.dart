@@ -4,12 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
 import 'pages/combined_avatar_and_collection.dart';
-import 'pages/avatar.dart';
 import 'pages/diary.dart';
 import 'pages/habits.dart';
 import 'pages/settings.dart';
 import 'pages/login_page.dart';
-import 'pages/minigames.dart';
 import 'services/reward_notifier.dart';
 import 'services/reward_service.dart';
 import '/data/repositories/user_repository.dart';
@@ -33,6 +31,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+
+      routes:{
+        '/settings':(context) => SettingsPage(),
+      },
+
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
@@ -60,7 +63,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
   bool _rewardDialogShowing = false;
-  int selectedIndex = 2;
+  int selectedIndex = 0;
   late TabController tabController;
   late List<Widget> pages;
 
@@ -72,11 +75,10 @@ class _MainScreenState extends State<MainScreen>
       CombinedAvatarAndCollectionPage(userId: widget.userId),
       HabitsPage(),
       DiaryPage(),
-      SettingsPage(),
     ];
 
     tabController = TabController(
-        length: 5, vsync: this, initialIndex: selectedIndex);
+        length: 3, vsync: this, initialIndex: selectedIndex);
     tabController.addListener(() {
       if (tabController.index != selectedIndex) {
         setState(() => selectedIndex = tabController.index);
@@ -137,9 +139,7 @@ class _MainScreenState extends State<MainScreen>
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Avataras"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Statistikos"),
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Nustatymai"),
         ],
       ),
     );

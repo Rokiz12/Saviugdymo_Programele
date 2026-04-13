@@ -5,6 +5,7 @@ import 'package:pvp/features/habits/models/models.dart';
 import 'package:pvp/features/habits/utils/goalProgress.dart';
 import 'package:pvp/features/habits/dialogs/habitEditorDialog.dart';
 import 'package:pvp/features/habits/dialogs/goalEditDialog.dart';
+import '../widgets/custom_app_bar.dart';
 
 class HabitsPage extends StatefulWidget {
   const HabitsPage({super.key});
@@ -355,11 +356,8 @@ class _HabitsPageState extends State<HabitsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Įpročiai"),
-        backgroundColor: Colors.yellow,
-        centerTitle: true,
-      ),
+
+      appBar: const CustomAppBar(title: "Įpročiai"),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

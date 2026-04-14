@@ -4,12 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
 import 'pages/combined_avatar_and_collection.dart';
-import 'pages/avatar.dart';
 import 'pages/diary.dart';
+import 'pages/statistics.dart';
 import 'pages/habits.dart';
 import 'pages/settings.dart';
 import 'pages/login_page.dart';
-import 'pages/minigames.dart';
 import 'services/reward_notifier.dart';
 import 'services/reward_service.dart';
 import '/data/repositories/user_repository.dart';
@@ -70,6 +69,7 @@ class _MainScreenState extends State<MainScreen>
 
     pages = [
       CombinedAvatarAndCollectionPage(userId: widget.userId),
+      StatisticsPage(userId: widget.userId),
       HabitsPage(),
       DiaryPage(),
       SettingsPage(),
@@ -136,7 +136,7 @@ class _MainScreenState extends State<MainScreen>
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Avataras"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Statistikos"),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Statistikos"),
           BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Nustatymai"),

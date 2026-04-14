@@ -11,12 +11,14 @@ import 'pages/login_page.dart';
 import 'pages/minigames.dart';
 import 'services/reward_notifier.dart';
 import 'services/reward_service.dart';
+import 'services/image_preloader.dart';
 import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  preloadPetImages();
   runApp(
     ChangeNotifierProvider(
       create: (_) => RewardNotifier(),

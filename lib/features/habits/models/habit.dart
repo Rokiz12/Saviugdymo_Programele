@@ -5,8 +5,8 @@ class Habit {
   final String name;
   final RatingKind kind;
   final int? min;
-  final int? max; // for int range
-  final List<String>? options; // enum options
+  final int? max;
+  final List<String>? options;
   final bool archived;
   final bool systemOnly;
 

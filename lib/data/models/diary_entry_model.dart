@@ -10,6 +10,7 @@ class DiaryEntryModel {
   final String gratitude;
   final String diaryText;
   final String preview;
+  final String? imageUrl;
 
   // konstruktorius
   DiaryEntryModel({
@@ -21,6 +22,7 @@ class DiaryEntryModel {
     required this.gratitude,
     required this.diaryText,
     required this.preview,
+    this.imageUrl,
   });
 
   // Iš Firestore į Modelį
@@ -38,6 +40,7 @@ class DiaryEntryModel {
       gratitude: data['gratitude'] ?? '',
       diaryText: data['diaryText'] ?? '',
       preview: data['preview'] ?? '',
+      imageUrl: data['imageUrl'],
     );
   }
 
@@ -51,6 +54,7 @@ class DiaryEntryModel {
       'gratitude': gratitude,
       'diaryText': diaryText,
       'preview': preview,
+      'imageUrl': imageUrl,
     };
   }
 

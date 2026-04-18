@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'dart:math';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 
@@ -10,448 +12,712 @@ class DiaryPage extends StatefulWidget {
   State<DiaryPage> createState() => _DiaryPageState();
 }
 
-class _DiaryPageState extends State<DiaryPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _DiaryPageState extends State<DiaryPage> {
   final DiaryRepository _repository = DiaryRepository();
-
-  // Laikinas useris
   final String _userId = "test_user_123";
+  
+  // Image variables
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
-  // Mood tracker kintamieji
+  // Calendar
+  DateTime _currentMonth = DateTime.now();
+  DateTime? _selectedDay;
+  Map<DateTime, List<DiaryEntryModel>> _entriesByDate = {};
+
+  // Form
   String selectedMood = "";
-  final highlightController = TextEditingController();
-  final betterController = TextEditingController();
-  final gratitudeController = TextEditingController();
+  final textControllers =[
+    TextEditingController(), // 0: highlight
+    TextEditingController(), // 1: better
+    TextEditingController(), // 2: gratitude
+    TextEditingController(), // 3: journal
+  ];
 
-  // Dienorasti inputas
-  final freeJournalController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        setState(() {});
-      }
-    });
-  }
+  final List<String> _weekDays =['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
+  final List<String> _moods =['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
+  final List<String> _moodEmojis = ['😀', '🙂', '😐', '😢', '😭'];
 
   @override
   void dispose() {
-    _tabController.dispose();
-    highlightController.dispose();
-    betterController.dispose();
-    gratitudeController.dispose();
-    freeJournalController.dispose();
+    for (var c in textControllers) c.dispose();
     super.dispose();
   }
 
-  // id kurimas
-  String _generateId() {
-    final now = DateTime.now();
-    final random = Random().nextInt(10000);
-    return '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}${now.millisecond.toString().padLeft(3, '0')}_$random';
+  // image picking fucntions
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 70, 
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Nepavyko atidaryti kameros/galerijos: $e")),
+        );
+      }
+    }
   }
 
-  // Irasas
-  Widget _buildNewEntryTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Kaip šiandien jautiesi?",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _moodButton("😀", "Puikiai"),
-              _moodButton("🙂", "Gerai"),
-              _moodButton("😐", "Normaliai"),
-              _moodButton("😢", "Prastai"),
-              _moodButton("😭", "Blogai"),
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.black),
+                title: const Text('Pasirinkti iš galerijos'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera, color: Colors.black),
+                title: const Text('Daryti naują nuotrauką'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickImage(ImageSource.camera);
+                },
+              ),
             ],
           ),
-
-          const SizedBox(height: 24),
-
-          _questionField("Kas šiandien nutiko gero?", highlightController),
-          _questionField("Kas galėjo būti geriau?", betterController),
-          _questionField("Už ką tu šiandien dėkingas?", gratitudeController),
-
-          const SizedBox(height: 16),
-
-          Divider(thickness: 2, color: Colors.grey[300]),
-
-          const SizedBox(height: 16),
-
-          _freeJournalField(),
-
-          const SizedBox(height: 24),
-
-          Center(
-            child: ElevatedButton(
-              onPressed: _saveEntry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                "Išsaugoti įrašą",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // Irasu perziura
-  Widget _buildViewEntriesTab() {
-    return StreamBuilder<List<DiaryEntryModel>>(
-      stream: _repository.streamEntries(_userId),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              "Klaida: ${snapshot.error}",
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final entries = snapshot.data ?? [];
-
-        if (entries.isEmpty) {
-          return const Center(
-            child: Text(
-              "Dar nėra įrašų",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: entries.length,
-          itemBuilder: (context, index) {
-            final entry = entries[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.yellow[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    entry.mood,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-                title: Text(
-                  _formatDate(entry.createdAt),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  entry.preview,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _showEntryDetails(entry),
-              ),
-            );
-          },
         );
       },
     );
   }
 
-  // Pagalbiniai widgetai
+  // save entry function
 
-  Widget _moodButton(String emoji, String label) {
-    bool isSelected = selectedMood == label;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedMood = label;
-        });
-      },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isSelected ? Colors.yellow[200] : Colors.grey[200],
-              borderRadius: BorderRadius.circular(12),
-              border: isSelected ? Border.all(color: Colors.yellow[800]!, width: 2) : null,
-            ),
-            child: Text(
-              emoji,
-              style: const TextStyle(fontSize: 28),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _questionField(String question, TextEditingController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          question,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          maxLines: 2,
-          decoration: InputDecoration(
-            hintText: "Rašyk čia...",
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Colors.grey[50],
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _freeJournalField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Laisvas dienoraštis",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            controller: freeJournalController,
-            maxLines: 5,
-            decoration: InputDecoration(
-              hintText: "Rašyk čia...",
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.all(16),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  // funkcijos
-
-  void _saveEntry() async {
+  Future<void> _saveEntry() async {
     if (selectedMood.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Pasirink nuotaiką!")),
       );
       return;
     }
 
-    final now = DateTime.now();
+    final navigator = Navigator.of(context);
 
-    // Sukuriam ID iš DateTime
-    final String id = _generateId();
-
-    // Sukuriam naują įrašą naudojant modelį
-    final newEntry = DiaryEntryModel(
-      id: id,
-      createdAt: now,
-      mood: _getMoodEmoji(selectedMood) + " " + selectedMood,
-      highlight: highlightController.text,
-      better: betterController.text,
-      gratitude: gratitudeController.text,
-      diaryText: freeJournalController.text,
-      preview: DiaryEntryModel.generatePreview(
-        highlightController.text,
-        freeJournalController.text,
-      ),
-    );
-
-    // Saugom į Firestore
-    await _repository.addEntry(_userId, newEntry);
-
-    // Išvalom laukus
-    setState(() {
-      selectedMood = "";
-    });
-    highlightController.clear();
-    betterController.clear();
-    gratitudeController.clear();
-    freeJournalController.clear();
-
-    // Rodom patvirtinimą
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Įrašas išsaugotas!"),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    // Perjungiam į įrašų peržiūrą
-    _tabController.animateTo(1);
-  }
-
-  String _getMoodEmoji(String mood) {
-    switch(mood) {
-      case "Puikiai": return "😀";
-      case "Gerai": return "🙂";
-      case "Normaliai": return "😐";
-      case "Prastai": return "😢";
-      case "Blogai": return "😭";
-      default: return "😐";
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final entryDate = DateTime(date.year, date.month, date.day);
-
-    if (entryDate == today) {
-      return "Šiandien";
-    }
-
-    final yesterday = today.subtract(const Duration(days: 1));
-    if (entryDate == yesterday) {
-      return "Vakar";
-    }
-
-    const months = [
-      'Sausio', 'Vasario', 'Kovo', 'Balandžio', 'Gegužės', 'Birželio',
-      'Liepos', 'Rugpjūčio', 'Rugsėjo', 'Spalio', 'Lapkričio', 'Gruodžio'
-    ];
-    return '${date.day} ${months[date.month - 1]}';
-  }
-
-  void _showEntryDetails(DiaryEntryModel entry) {
+    // show loading
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(_formatDate(entry.createdAt)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Mood
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.yellow[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(entry.mood),
-              ),
-              const SizedBox(height: 16),
+      barrierDismissible: false,
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator(color: Colors.yellow)),
+    );
 
-              // Mood tracker answers
-              if (entry.highlight.isNotEmpty) ...[
-                const Text("✨ Kas gero:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry.highlight),
-                const SizedBox(height: 8),
-              ],
+    final now = DateTime.now();
+    final id = '${now.millisecondsSinceEpoch}';
+    String? uploadedImageUrl;
 
-              if (entry.better.isNotEmpty) ...[
-                const Text("📝 Galėjo būti geriau:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry.better),
-                const SizedBox(height: 8),
-              ],
+    try {
+      // upload image
+      if (_selectedImage != null) {
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('users')
+            .child(_userId)
+            .child('diary_images')
+            .child('$id.jpg');
 
-              if (entry.gratitude.isNotEmpty) ...[
-                const Text("🙏 Dėkingas:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry.gratitude),
-                const SizedBox(height: 8),
-              ],
+        final task = await ref.putFile(_selectedImage!);
+        uploadedImageUrl = await task.ref.getDownloadURL();
+      }
 
-              // Free journal
-              if (entry.diaryText.isNotEmpty) ...[
-                const Divider(),
-                const Text("📖 Dienoraštis:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(entry.diaryText),
-              ],
+      final preview = textControllers[0].text.isNotEmpty
+          ? textControllers[0].text
+          : (textControllers[3].text.isNotEmpty
+              ? textControllers[3].text
+              : "Tuščias įrašas");
+
+      await _repository.addEntry(
+        _userId,
+        DiaryEntryModel(
+          id: id,
+          createdAt: now,
+          mood: '${_moodEmojis[_moods.indexOf(selectedMood)]} $selectedMood',
+          highlight: textControllers[0].text,
+          better: textControllers[1].text,
+          gratitude: textControllers[2].text,
+          diaryText: textControllers[3].text,
+          preview: preview.length > 50
+              ? '${preview.substring(0, 47)}...'
+              : preview,
+          imageUrl: uploadedImageUrl,
+        ),
+      );
+
+      if (!mounted) return;
+
+      // close loading
+      navigator.pop();
+
+      setState(() {
+        selectedMood = "";
+        _selectedImage = null;
+      });
+
+      for (var c in textControllers) {
+        c.clear();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Įrašas išsaugotas!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // delay tab switch to next frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        DefaultTabController.of(context)?.animateTo(1);
+      });
+      
+    } catch (e) {
+      if (mounted) navigator.pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Klaida: $e")),
+        );
+      }
+    }
+  }
+
+  // calendar helpers
+
+  void _groupEntries(List<DiaryEntryModel> entries) {
+    _entriesByDate = {};
+    for (var e in entries) {
+      DateTime date = DateTime(e.createdAt.year, e.createdAt.month, e.createdAt.day);
+      (_entriesByDate[date] ??=[]).add(e);
+    }
+  }
+
+  List<DateTime> _getDaysInMonth() {
+    DateTime first = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    DateTime last = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
+    int leading = first.weekday - 1;
+
+    var days = List.generate(leading, (i) => DateTime(first.year, first.month, -i)).reversed.toList();
+    days.addAll(List.generate(last.day, (i) => DateTime(first.year, first.month, i + 1)));
+    return days;
+  }
+
+  String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  String _getMonthName(int m) =>['Sausis', 'Vasaris', 'Kovas', 'Balandis', 'Gegužė', 'Birželis',
+        'Liepa', 'Rugpjūtis', 'Rugsėjis', 'Spalis', 'Lapkritis', 'Gruodis'][m - 1];
+
+  // ui widgets
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Dienoraštis'),
+          backgroundColor: Colors.yellow,
+          bottom: const TabBar(
+            tabs:[
+              Tab(icon: Icon(Icons.add), text: "Naujas"),
+              Tab(icon: Icon(Icons.calendar_month), text: "Kalendorius"),
+              Tab(icon: Icon(Icons.photo_library), text: "Prisiminimai"),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Uždaryti"),
+        body: StreamBuilder<List<DiaryEntryModel>>(
+          stream: _repository.streamEntries(_userId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final entries = snapshot.data ??[];
+            _groupEntries(entries);
+
+            return TabBarView(
+              children:[
+                _buildNewEntryTab(),
+                _buildCalendarTab(),
+                _buildMemoriesTab(entries), 
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewEntryTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children:[
+          const Text("Kaip jautiesi?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(5, (i) => _moodBtn(i)),
+          ),
+          const SizedBox(height: 24),
+          _buildField("Kas gero?", 0),
+          _buildField("Galėjo būti geriau?", 1),
+          _buildField("Už ką dėkingas?", 2),
+          _buildField("Laisvas dienoraštis", 3, maxLines: 4),
+          
+          const SizedBox(height: 24),
+
+          // image add 
+          const Text(
+            "Prisegti nuotrauką (neprivaloma)",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _showImagePickerOptions, 
+            child: Container(
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: _selectedImage != null
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children:[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedImage = null),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 20),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children:[
+                        Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text("Paspauskite, kad pridėtumėte", style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+            ),
+          ),
+
+          const SizedBox(height: 32), 
+
+          ElevatedButton(
+            onPressed: _saveEntry,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.yellow,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+            ),
+            child: const Text("Išsaugoti įrašą", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
     );
   }
 
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Dienoraštis',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
+  Widget _buildCalendarTab() {
+    return Column(
+      children:[
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children:[
+              IconButton(onPressed: () => setState(() => _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1)), icon: const Icon(Icons.chevron_left)),
+              Text('${_currentMonth.year} ${_getMonthName(_currentMonth.month)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              IconButton(onPressed: () => setState(() => _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1)), icon: const Icon(Icons.chevron_right)),
+            ],
           ),
         ),
-        backgroundColor: Colors.yellow,
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.add), text: "Naujas"),
-            Tab(icon: Icon(Icons.list), text: "Įrašai"),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: _weekDays.map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold))))).toList(),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 1),
+              itemCount: _getDaysInMonth().length,
+              itemBuilder: (context, index) {
+                final day = _getDaysInMonth()[index];
+                final isCurrent = day.month == _currentMonth.month;
+                final hasEntry = _entriesByDate.containsKey(DateTime(day.year, day.month, day.day));
+                final isSelected = _selectedDay != null &&
+                    day.year == _selectedDay!.year && day.month == _selectedDay!.month && day.day == _selectedDay!.day;
+
+                return GestureDetector(
+                  onTap: isCurrent ? () => _onDayTap(day) : null,
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? Colors.yellow : (isCurrent && hasEntry ? Colors.yellow[100] : null),
+                    ),
+                    child: Center(child: Text(
+                      day.day.toString(),
+                      style: TextStyle(color: isCurrent ? Colors.black : Colors.grey[300]),
+                    )),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton.icon(
+            onPressed: () => DefaultTabController.of(context).animateTo(0),
+            icon: const Icon(Icons.add),
+            label: const Text("Pridėti naują įrašą"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.yellow,
+              foregroundColor: Colors.black,
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // memories tab
+  Widget _buildMemoriesTab(List<DiaryEntryModel> allEntries) {
+    final memories = allEntries.where((e) => e.imageUrl != null && e.imageUrl!.isNotEmpty).toList();
+    memories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (memories.isEmpty) {
+      return const Center(
+        child: Text(
+          "Dar nėra jokių nuotraukų.\nPridėkite nuotraukų prie savo įrašų!",
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey, fontSize: 16),
+        ),
+      );
+    }
+
+    final today = DateTime.now();
+    DiaryEntryModel? specialMemory;
+    String memoryTitle = "";
+
+    try {
+      specialMemory = memories.firstWhere((e) => 
+        e.createdAt.year == today.year - 1 && 
+        e.createdAt.month == today.month && 
+        e.createdAt.day == today.day
+      );
+      memoryTitle = "Lygiai prieš 1 metus...";
+    } catch (_) {}
+
+    if (specialMemory == null) {
+      final oneMonthAgo = DateTime(today.year, today.month - 1, today.day);
+      try {
+        specialMemory = memories.firstWhere((e) => 
+          e.createdAt.year == oneMonthAgo.year && 
+          e.createdAt.month == oneMonthAgo.month && 
+          e.createdAt.day == oneMonthAgo.day
+        );
+        memoryTitle = "Prieš 1 mėnesį šią dieną...";
+      } catch (_) {}
+    }
+
+    return Column(
+      children:[
+        if (specialMemory != null) 
+          _buildSpecialMemoryCard(specialMemory, memoryTitle),
+
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(4),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3, 
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: memories.length,
+            itemBuilder: (context, index) {
+              final entry = memories[index];
+              return GestureDetector(
+                onTap: () => _showEntryDialog(entry),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children:[
+                      Image.network(
+                        entry.imageUrl!,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey[200],
+                            child: const Center(child: CircularProgressIndicator(color: Colors.yellow)),
+                          );
+                        },
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors:[Colors.black87, Colors.transparent],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            ),
+                          ),
+                          child: Text(
+                            _formatDate(entry.createdAt),
+                            style: const TextStyle(
+                              color: Colors.white, 
+                              fontSize: 11, 
+                              fontWeight: FontWeight.bold
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecialMemoryCard(DiaryEntryModel entry, String title) {
+    return GestureDetector(
+      onTap: () => _showEntryDialog(entry),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        height: 180,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const[
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            )
           ],
-          labelColor: Colors.black,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.black,
+          image: DecorationImage(
+            image: NetworkImage(entry.imageUrl!),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              colors: [Colors.black87, Colors.transparent],
+              begin: Alignment.bottomCenter,
+              end: Alignment.center,
+            )
+          ),
+          padding: const EdgeInsets.all(16),
+          alignment: Alignment.bottomLeft,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children:[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.yellow,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children:[
+                    const Icon(Icons.history, size: 16, color: Colors.black),
+                    const SizedBox(width: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
-      body: IndexedStack(
-        index: _tabController.index,
-        children: [
-          _buildNewEntryTab(),
-          _buildViewEntriesTab(),
+    );
+  }
+
+  void _onDayTap(DateTime day) {
+    setState(() => _selectedDay = day);
+    final entries = _entriesByDate[DateTime(day.year, day.month, day.day)];
+
+    if (entries == null || entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Nėra įrašų ${_formatDate(day)}")),
+      );
+    } else if (entries.length == 1) {
+      _showEntryDialog(entries.first);
+    } else {
+      _showEntriesList(entries);
+    }
+  }
+
+  void _showEntryDialog(DiaryEntryModel e) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(_formatDate(e.createdAt)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children:[
+              Container(
+                padding: const EdgeInsets.all(8), 
+                color: Colors.yellow[100], 
+                child: Text(e.mood)
+              ),
+              if (e.highlight.isNotEmpty) ...[
+                const SizedBox(height: 8), 
+                Text("✨ ${e.highlight}")
+              ],
+              if (e.diaryText.isNotEmpty) ...[
+                const SizedBox(height: 8), 
+                Text("📖 ${e.diaryText}")
+              ],
+              
+              if (e.imageUrl != null && e.imageUrl!.isNotEmpty) ...[
+                 const SizedBox(height: 16),
+                 ClipRRect(
+                   borderRadius: BorderRadius.circular(12),
+                   child: Image.network(
+                     e.imageUrl!,
+                     fit: BoxFit.contain,
+                   ),
+                 ),
+              ]
+            ],
+          ),
+        ),
+        actions:[
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text("Uždaryti")
+          )
+        ],
+      ),
+    );
+  }
+
+  void _showEntriesList(List<DiaryEntryModel> entries) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children:[
+            Text(_formatDate(entries.first.createdAt), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ...entries.map((e) => ListTile(
+              leading: Text(e.mood.split(' ')[0]),
+              title: Text('${e.createdAt.hour}:${e.createdAt.minute}'),
+              subtitle: Text(e.preview, maxLines: 1),
+              onTap: () { Navigator.pop(context); _showEntryDialog(e); },
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _moodBtn(int i) {
+    return GestureDetector(
+      onTap: () => setState(() => selectedMood = _moods[i]),
+      child: Column(
+        children:[
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: selectedMood == _moods[i] ? Colors.yellow[200] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
+              border: selectedMood == _moods[i] ? Border.all(color: Colors.yellow[800]!, width: 2) : null,
+            ),
+            child: Text(_moodEmojis[i], style: const TextStyle(fontSize: 24)),
+          ),
+          Text(_moods[i], style: const TextStyle(fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField(String hint, int index, {int maxLines = 2}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children:[
+          Text(hint, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: textControllers[index],
+            maxLines: maxLines,
+            decoration: InputDecoration(
+              hintText: "Rašyk čia...",
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              filled: true,
+              fillColor: Colors.grey[50],
+            ),
+          ),
         ],
       ),
     );

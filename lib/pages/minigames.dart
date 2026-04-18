@@ -52,7 +52,6 @@ class _CollectionPageState extends State<CollectionPage> {
         _isLoading = false;
       });
 
-      // After pets load, start listening to user document in real time
       _userSubscription = FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userId)
@@ -75,29 +74,37 @@ class _CollectionPageState extends State<CollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
 
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ));
+          }
+
+
+
+
+      if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_error!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadData,
+              child: const Text('Retry'),
+            ),
+          ],
         ),
       );
     }
+
+
 
     const rarityOrder = ['Common', 'Rare', 'Epic', 'Legendary'];
 
@@ -111,17 +118,11 @@ class _CollectionPageState extends State<CollectionPage> {
         .map((r) => MapEntry(r, petsByRarity[r]!))
         .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Kolekcija',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.yellow,
-        centerTitle: true,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(12),
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: sortedEntries.map((entry) {
           return _RaritySection(
             rarity: entry.key,
@@ -134,7 +135,7 @@ class _CollectionPageState extends State<CollectionPage> {
       ),
     );
   }
-}
+  }
 
 Color _rarityColor(String rarity) {
   switch (rarity) {
@@ -446,7 +447,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Pet image
                   Container(
                     width: 140,
                     height: 140,
@@ -502,7 +502,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
                   const SizedBox(height: 16),
 
-                  // Pet name
                   Text(
                     widget.isOwned ? widget.pet.name : '???',
                     style: TextStyle(
@@ -517,7 +516,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
                   const SizedBox(height: 6),
 
-                  // Rarity badge
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 4),
@@ -546,7 +544,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
                   const SizedBox(height: 20),
 
-                  // Level & XP row (owned only)
                   if (widget.isOwned && widget.userPet != null) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -567,11 +564,9 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                     const SizedBox(height: 20),
                   ],
 
-                  // Divider
                   Divider(color: Colors.grey.shade300),
                   const SizedBox(height: 12),
 
-                  // Lore section
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -624,7 +619,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
                   const SizedBox(height: 28),
 
-                  // Equip button
                   if (widget.isOwned)
                     SizedBox(
                       width: double.infinity,

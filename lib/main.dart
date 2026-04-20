@@ -70,7 +70,7 @@ class _MainScreenState extends State<MainScreen>
     pages = [
       CombinedAvatarAndCollectionPage(userId: widget.userId),
       StatisticsPage(userId: widget.userId),
-      HabitsPage(),
+      HabitsPage(userId: widget.userId),
       DiaryPage(),
       SettingsPage(),
     ];

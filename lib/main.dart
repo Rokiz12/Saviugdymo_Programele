@@ -13,6 +13,7 @@ import 'services/reward_notifier.dart';
 import 'services/reward_service.dart';
 import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
+import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,6 +85,7 @@ class _MainScreenState extends State<MainScreen>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      FCMService.init(widget.userId);
       context.read<RewardNotifier>().addListener(_onRewardChanged);
       _checkDailyReward();
     });

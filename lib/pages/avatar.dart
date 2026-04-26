@@ -93,7 +93,13 @@ class _AvatarPageState extends State<AvatarPage>
 
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
-        final imageUrl = pet?.images['collection'] ?? '';
+        final duplicateCount = petProgress?.duplicateCount ?? 0;
+
+        final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
+
+        final imageUrl = pet?.images[imageKey] ??
+            pet?.images.values.firstOrNull ??
+            '';
         const streak = 4;
 
         return Column(

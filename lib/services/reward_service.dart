@@ -73,6 +73,10 @@ class RewardService {
       await userDoc.update({
         'ownedPets.${picked.id}': {'xp': 0, 'level': 1},
       });
+    } else {
+      await userDoc.update({
+        'ownedPets.${picked.id}.duplicateCount': FieldValue.increment(1),
+      });
     }
 
     notifier.enqueue(PendingReward(
@@ -107,6 +111,10 @@ class RewardService {
       if (!duplicate) {
         tx.update(userRef, {
           'ownedPets.${picked.id}': {'xp': 0, 'level': 1},
+        });
+      } else {
+        tx.update(userRef, {
+          'ownedPets.${picked.id}.duplicateCount': FieldValue.increment(1),
         });
       }
 

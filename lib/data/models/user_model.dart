@@ -14,6 +14,7 @@ class UserModel {
   final List<String> fcmTokens;
   final Map<String, UserPetProgress> ownedPets;
   final String petMood;
+  final int streak;
 
   UserModel({
     required this.id,
@@ -28,6 +29,7 @@ class UserModel {
     this.fcmTokens = const [],
     this.ownedPets = const {},
     this.petMood = 'happy',
+    this.streak = 0,
   }) : lastDailyReward = lastDailyReward ?? DateTime(2000, 1, 1);
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
@@ -53,6 +55,7 @@ class UserModel {
         ),
       ),
       petMood: map['petMood'] ?? 'happy',
+      streak: map['streak'] ?? 0,
     );
   }
 
@@ -69,6 +72,7 @@ class UserModel {
       'fcmTokens': fcmTokens,
       'ownedPets': ownedPets.map((petId, progress) => MapEntry(petId, progress.toMap())),
       'petMood': petMood,
+      'streak': streak,
     };
   }
 }

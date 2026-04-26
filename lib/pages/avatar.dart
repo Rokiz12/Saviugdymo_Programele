@@ -100,7 +100,7 @@ class _AvatarPageState extends State<AvatarPage>
         final imageUrl = pet?.images[imageKey] ??
             pet?.images.values.firstOrNull ??
             '';
-        const streak = 4;
+        final streak = user.streak;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.center,

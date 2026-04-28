@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pvp/services/sound_service.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 
@@ -61,6 +62,12 @@ class _DiaryPageState extends State<DiaryPage> {
         const SnackBar(content: Text("Pasirink nuotaiką!")),
       );
       return;
+    }
+
+    if(_moods.indexOf(selectedMood)<=1) {
+      SoundService.playHappyDiary();
+    } else {
+      SoundService.playSadDiary();
     }
 
     final now = DateTime.now();

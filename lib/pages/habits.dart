@@ -5,6 +5,8 @@ import 'package:pvp/features/habits/models/models.dart';
 import 'package:pvp/features/habits/utils/goalProgress.dart';
 import 'package:pvp/features/habits/dialogs/habitEditorDialog.dart';
 import 'package:pvp/features/habits/dialogs/goalEditDialog.dart';
+import '../services/sound_service.dart';
+import '../features/habits/utils/habitIcons.dart';
 
 class HabitsPage extends StatefulWidget {
   final String userId;
@@ -177,6 +179,8 @@ class _HabitsPageState extends State<HabitsPage> {
 
     await _repo.deleteHabit(userId: widget.userId, habitId: h.id);
 
+    SoundService.playDeleteHabit();
+
     setState(() {
       _habits.removeWhere((x) => x.id == h.id);
       _today = _today?.removeValue(h.id);
@@ -285,6 +289,10 @@ class _HabitsPageState extends State<HabitsPage> {
   }
 
   void _setValue(Habit h, RatingValue v) {
+      SoundService.playMarkHabit();
+
+
+
     final newLog = (_today ??
         DayLog(
           dateUtc: DateTime.now().toUtc(),
@@ -400,7 +408,6 @@ class _HabitsPageState extends State<HabitsPage> {
               final h = _habits[index];
               final v = _today!.entries[h.id];
 
-
               return SizedBox(
                 height: 44,
                 child: Row(
@@ -412,12 +419,17 @@ class _HabitsPageState extends State<HabitsPage> {
                         onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              h.name,
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                          child: Row(                          // 👈 replaced Align
+                            children: [
+                              if (h.icon != null) ...[
+                                Icon(habitIconData(h.icon), size: 20),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                h.name,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -431,7 +443,6 @@ class _HabitsPageState extends State<HabitsPage> {
                   ],
                 ),
               );
-
             },
           ),
 

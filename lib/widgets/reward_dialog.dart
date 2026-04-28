@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/reward_notifier.dart';
+import '../services/sound_service.dart';
 
 class RewardDialog extends StatefulWidget {
   final PendingReward reward;
@@ -32,6 +33,8 @@ class _RewardDialogState extends State<RewardDialog>
   }
 
   void _onClaim() {
+    SoundService.palyClaimReward();
+
     setState(() => _revealed = true);
     _controller.forward();
   }

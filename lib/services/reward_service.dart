@@ -57,8 +57,20 @@ class RewardService {
 
       if (alreadyClaimed) return false;
 
-      // Mark claimed
-      tx.update(userDoc, {'lastDailyReward': FieldValue.serverTimestamp()});
+      // Check if streak should reset (gap > 1 day)
+      bool streakBroken = false;
+      if (lastClaim != null) {
+        final lastClaimDay = DateTime(lastClaim.year, lastClaim.month, lastClaim.day);
+        final today = DateTime(now.year, now.month, now.day);
+        final daysDiff = today.difference(lastClaimDay).inDays;
+        streakBroken = daysDiff > 1;
+      }
+
+      tx.update(userDoc, {
+        'lastDailyReward': FieldValue.serverTimestamp(),
+        'streak': streakBroken ? 1 : FieldValue.increment(1),
+      });
+
       return true;
     });
 
@@ -72,6 +84,10 @@ class RewardService {
     if (!isDuplicate) {
       await userDoc.update({
         'ownedPets.${picked.id}': {'xp': 0, 'level': 1},
+      });
+    } else {
+      await userDoc.update({
+        'ownedPets.${picked.id}.duplicateCount': FieldValue.increment(1),
       });
     }
 
@@ -107,6 +123,10 @@ class RewardService {
       if (!duplicate) {
         tx.update(userRef, {
           'ownedPets.${picked.id}': {'xp': 0, 'level': 1},
+        });
+      } else {
+        tx.update(userRef, {
+          'ownedPets.${picked.id}.duplicateCount': FieldValue.increment(1),
         });
       }
 

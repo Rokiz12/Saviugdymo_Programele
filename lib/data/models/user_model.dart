@@ -10,6 +10,7 @@ class UserModel {
   final DateTime createdAt;
   final String equippedPetId;
   final DateTime lastDailyReward;
+  final DateTime lastDiaryXp;
   final DateTime? lastRewardNotificationSent;
   final List<String> fcmTokens;
   final Map<String, UserPetProgress> ownedPets;
@@ -25,12 +26,14 @@ class UserModel {
     required this.createdAt,
     this.equippedPetId = '',
     DateTime? lastDailyReward,
+    DateTime? lastDiaryXp,
     this.lastRewardNotificationSent,
     this.fcmTokens = const [],
     this.ownedPets = const {},
     this.petMood = 'happy',
     this.streak = 0,
-  }) : lastDailyReward = lastDailyReward ?? DateTime(2000, 1, 1);
+  }) : lastDailyReward = lastDailyReward ?? DateTime(2000, 1, 1),
+       lastDiaryXp = lastDiaryXp ?? DateTime(2000, 1, 1);
 
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
     return UserModel(
@@ -43,6 +46,9 @@ class UserModel {
       equippedPetId: map['equippedPetId'] ?? '',
       lastDailyReward: map['lastDailyReward'] != null
           ? (map['lastDailyReward'] as Timestamp).toDate()
+          : null,
+      lastDiaryXp: map['lastDiaryXp'] != null
+          ? (map['lastDiaryXp'] as Timestamp).toDate()
           : null,
       lastRewardNotificationSent: map['lastRewardNotificationSent'] != null
           ? (map['lastRewardNotificationSent'] as Timestamp).toDate()
@@ -68,6 +74,7 @@ class UserModel {
       'createdAt': createdAt,
       'equippedPetId': equippedPetId,
       'lastDailyReward': lastDailyReward,
+      'lastDiaryXp':lastDiaryXp,
       'lastRewardNotificationSent': lastRewardNotificationSent,
       'fcmTokens': fcmTokens,
       'ownedPets': ownedPets.map((petId, progress) => MapEntry(petId, progress.toMap())),

@@ -150,22 +150,6 @@ class _AvatarPageState extends State<AvatarPage>
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              color: Colors.yellow,
-              child: const Center(
-                child: Text(
-                  "Avataras",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-            ),
-
-            Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFFF6F8FF), Color(0xFFE9EEFF)],

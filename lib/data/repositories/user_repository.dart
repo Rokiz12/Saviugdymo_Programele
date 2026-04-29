@@ -81,4 +81,44 @@ class UserRepository {
     await _users.doc(userId).update({'petMood': mood});
   }
 
+  Future<bool> tryGiveDiaryXp(String userId, int xpToAdd) async {
+    final userRef = _users.doc(userId);
+
+    return await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(userRef);
+      final data = snap.data() as Map<String, dynamic>;
+
+      final now = DateTime.now();
+
+      DateTime lastDiaryXp;
+
+      if (data['lastDiaryXp'] != null) {
+        lastDiaryXp = (data['lastDiaryXp'] as Timestamp).toDate();
+      } else {
+        lastDiaryXp = DateTime(2000, 1, 1);
+      }
+
+      bool isSameDay(DateTime a, DateTime b) {
+        return a.year == b.year &&
+            a.month == b.month &&
+            a.day == b.day;
+      }
+
+      if (isSameDay(lastDiaryXp, now)) {
+        return false;
+      }
+
+      final newXp = (data['xp'] as int) + xpToAdd;
+      final newLevel = (newXp / 100).floor() + 1;
+
+      tx.update(userRef, {
+        'xp': newXp,
+        'level': newLevel,
+        'lastDiaryXp': now,
+      });
+
+      return true;
+    });
+  }
+
 }

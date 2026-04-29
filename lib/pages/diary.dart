@@ -889,7 +889,7 @@ class _FullScreenComparisonPageState extends State<FullScreenComparisonPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black, 
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
@@ -898,11 +898,11 @@ class _FullScreenComparisonPageState extends State<FullScreenComparisonPage> {
       ),
       body: Center(
         child: AspectRatio(
-          aspectRatio: 3 / 4,
+          aspectRatio: 3 / 4, 
           child: BeforeAfter(
             value: _sliderValue,
-            before: Image.network(widget.beforeEntry.imageUrl!, fit: BoxFit.cover),
-            after: Image.network(widget.afterEntry.imageUrl!, fit: BoxFit.cover),
+            before: Image.network(widget.afterEntry.imageUrl!, fit: BoxFit.cover),
+            after: Image.network(widget.beforeEntry.imageUrl!, fit: BoxFit.cover),
             trackColor: Colors.yellow,
             thumbColor: Colors.yellow,
             onValueChanged: (value) {

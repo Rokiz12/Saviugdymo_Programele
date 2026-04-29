@@ -4,6 +4,8 @@ import '../data/models/diary_entry_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/custom_app_bar.dart';
 import '../data/repositories/user_repository.dart';
+import '../data/repositories/diary_question_repository.dart';
+import '../data/models/diary_question_model.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -14,7 +16,9 @@ class DiaryPage extends StatefulWidget {
 
 class _DiaryPageState extends State<DiaryPage> {
   final DiaryRepository _repository = DiaryRepository();
+  final DiaryQuestionRepository _questionRepository = DiaryQuestionRepository();
   final String _userId = FirebaseAuth.instance.currentUser!.uid;
+
   // Calendar
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDay;
@@ -22,16 +26,37 @@ class _DiaryPageState extends State<DiaryPage> {
 
   // Form
   String selectedMood = "";
-  final textControllers = [
-    TextEditingController(), // highlight
-    TextEditingController(), // better
-    TextEditingController(), // gratitude
-    TextEditingController(), // journal
-  ];
+  List<DiaryQuestionModel> _currentQuestions = [];
+  late List<TextEditingController> textControllers;
+  bool _questionsLoaded = false;
 
   final List<String> _weekDays = ['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
   final List<String> _moods = ['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
   final List<String> _moodEmojis = ['😀', '🙂', '😐', '😢', '😭'];
+
+  @override
+  void initState() {
+    super.initState();
+    textControllers = List.generate(3, (_) => TextEditingController());
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    try {
+      final questions = await _questionRepository.getOneRandomFromEachCategory(
+        ['highlight', 'reflect', 'gratitude'],
+      );
+      setState(() {
+        _currentQuestions = questions;
+        _questionsLoaded = true;
+      });
+    } catch (e) {
+      print("Error loading questions: $e");
+      setState(() {
+        _questionsLoaded = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -69,7 +94,7 @@ class _DiaryPageState extends State<DiaryPage> {
 
     final preview = textControllers[0].text.isNotEmpty
         ? textControllers[0].text
-        : (textControllers[3].text.isNotEmpty ? textControllers[3].text : "Tuščias įrašas");
+        : (textControllers[2].text.isNotEmpty ? textControllers[2].text : "Tuščias įrašas");
 
     await _repository.addEntry(_userId, DiaryEntryModel(
       id: '${now.millisecondsSinceEpoch}',
@@ -78,12 +103,13 @@ class _DiaryPageState extends State<DiaryPage> {
       highlight: textControllers[0].text,
       better: textControllers[1].text,
       gratitude: textControllers[2].text,
-      diaryText: textControllers[3].text,
+      diaryText: '',
       preview: preview.length > 50 ? '${preview.substring(0, 47)}...' : preview,
     ));
 
     setState(() => selectedMood = "");
     for (var c in textControllers) c.clear();
+    _loadQuestions(); // Load new random questions
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,6 +166,36 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Widget _buildNewEntryTab() {
+    if (!_questionsLoaded) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_currentQuestions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                "Atsiprašome, klausimai nėra prieinami",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadQuestions,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Bandyti dar kartą"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -151,10 +207,14 @@ class _DiaryPageState extends State<DiaryPage> {
             children: List.generate(5, (i) => _moodBtn(i)),
           ),
           const SizedBox(height: 24),
-          _buildField("Kas gero?", 0),
-          _buildField("Galėjo būti geriau?", 1),
-          _buildField("Už ką dėkingas?", 2),
-          _buildField("Laisvas dienoraštis", 3, maxLines: 4),
+          ...[
+            for (int i = 0; i < _currentQuestions.length; i++)
+              _buildField(
+                _currentQuestions[i].question,
+                i,
+                maxLines: _currentQuestions[i].maxLines,
+              ),
+          ],
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _saveEntry,

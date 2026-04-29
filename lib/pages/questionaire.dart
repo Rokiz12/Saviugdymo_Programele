@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../features/habits/models/habit.dart';
+import '../features/habits/models/goalsModel.dart';
+import '../features/habits/models/ratingKind.dart';
 
 class QuestionnaireScreen extends StatefulWidget {
   const QuestionnaireScreen({super.key});
@@ -9,87 +14,154 @@ class QuestionnaireScreen extends StatefulWidget {
 }
 
 class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
-  // Main categories
+
   bool fitness = false;
-  bool nutrition = false;
   bool sleep = false;
   bool productivity = false;
 
-  // Fitness types
   bool running = false;
   bool gym = false;
   bool walking = false;
 
-  // Controllers
-  final TextEditingController fitnessDaysController = TextEditingController();
-  final TextEditingController sleepHoursController = TextEditingController();
-  final TextEditingController productivityHoursController = TextEditingController();
+  final runningKmController = TextEditingController();
+  final gymDaysController = TextEditingController();
+  final walkingStepsController = TextEditingController();
+  final sleepHoursController = TextEditingController();
+  final productivityHoursController = TextEditingController();
 
-  final TextEditingController runningKmController = TextEditingController();
-  final TextEditingController gymDaysController = TextEditingController();
-  final TextEditingController walkingStepsController = TextEditingController();
+  // 🔥 UNIVERSALI FUNKCIJA (be copy-paste)
+  Future<void> _createHabitWithGoal({
+    required String userId,
+    required String habitName,
+    required RatingKind kind,
+    required int target,
+    required GoalPeriod period,
+    required String goalName,
+    int? min,
+    int? max,
+  }) async {
+    final db = FirebaseFirestore.instance;
 
-  List<String> generateGoals() {
-    List<String> goals = [];
+    // 🔥 Firestore sugeneruoja ID
+    final habitRef = db
+        .collection('users')
+        .doc(userId)
+        .collection('habits')
+        .doc();
 
-    if (fitness) {
-      final days = fitnessDaysController.text;
-      if (days.isNotEmpty) {
-        goals.add("Sportuoti $days dienas per savaitę");
-      }
+    final habit = Habit(
+      id: habitRef.id,
+      name: habitName,
+      kind: kind,
+      min: min,
+      max: max,
+    );
 
-      if (running) {
-        final km = runningKmController.text;
-        if (km.isNotEmpty) {
-          goals.add("Bėgti $km km per savaitę");
-        }
-      }
+    await habitRef.set(habit.toJson());
 
-      if (gym) {
-        final gymDays = gymDaysController.text;
-        if (gymDays.isNotEmpty) {
-          goals.add("Eiti į sporto salę $gymDays kartus per savaitę");
-        }
-      }
+    // 🔥 Goal su tuo pačiu habit ID
+    final goalRef = db
+        .collection('users')
+        .doc(userId)
+        .collection('goals')
+        .doc();
 
-      if (walking) {
-        final steps = walkingStepsController.text;
-        if (steps.isNotEmpty) {
-          goals.add("Nueiti $steps žingsnių per dieną");
-        }
-      }
-    }
+    final goal = Goal(
+      id: goalRef.id,
+      name: goalName,
+      habbitID: habit.id,
+      target: target,
+      period: period,
+      repeat: true,
+    );
 
-    if (sleep) {
-      final hours = sleepHoursController.text;
-      if (hours.isNotEmpty) {
-        goals.add("Miegoti $hours valandas per parą");
-      }
-    }
-
-    if (productivity) {
-      final hours = productivityHoursController.text;
-      if (hours.isNotEmpty) {
-        goals.add("Būti produktyviam $hours valandas per dieną");
-      }
-    }
-
-    return goals;
+    await goalRef.set(goal.toJson());
   }
 
-  void submit() async {
+  // 🔥 MAIN SAVE LOGIC
+  Future<void> saveToFirebase() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final goals = generateGoals();
+    final userId = user.uid;
 
-    print(goals);
+    // RUNNING
+    if (running && runningKmController.text.isNotEmpty) {
+      await _createHabitWithGoal(
+        userId: userId,
+        habitName: "Bėgimas",
+        kind: RatingKind.number,
+        target: int.parse(runningKmController.text),
+        period: GoalPeriod.week,
+        goalName: "Bėgti ${runningKmController.text} km per savaitę",
+        min: 0,
+        max: 200,
+      );
+    }
+
+    // GYM
+    if (gym && gymDaysController.text.isNotEmpty) {
+      await _createHabitWithGoal(
+        userId: userId,
+        habitName: "Sporto salė",
+        kind: RatingKind.checkbox,
+        target: int.parse(gymDaysController.text),
+        period: GoalPeriod.week,
+        goalName: "Eiti į salę ${gymDaysController.text} kartus/sav.",
+      );
+    }
+
+    // WALKING
+    if (walking && walkingStepsController.text.isNotEmpty) {
+      await _createHabitWithGoal(
+        userId: userId,
+        habitName: "Vaikščiojimas",
+        kind: RatingKind.number,
+        target: int.parse(walkingStepsController.text),
+        period: GoalPeriod.day,
+        goalName: "Nueiti ${walkingStepsController.text} žingsnių per dieną",
+        min: 0,
+        max: 50000,
+      );
+    }
+
+    // SLEEP
+    if (sleep && sleepHoursController.text.isNotEmpty) {
+      await _createHabitWithGoal(
+        userId: userId,
+        habitName: "Miegas",
+        kind: RatingKind.number,
+        target: int.parse(sleepHoursController.text),
+        period: GoalPeriod.day,
+        goalName: "Miegoti ${sleepHoursController.text} valandas",
+        min: 0,
+        max: 24,
+      );
+    }
+
+    // PRODUCTIVITY
+    if (productivity && productivityHoursController.text.isNotEmpty) {
+      await _createHabitWithGoal(
+        userId: userId,
+        habitName: "Produktyvumas",
+        kind: RatingKind.number,
+        target: int.parse(productivityHoursController.text),
+        period: GoalPeriod.day,
+        goalName: "Dirbti ${productivityHoursController.text} valandas",
+        min: 0,
+        max: 24,
+      );
+    }
+  }
+
+  void submit() async {
+    await saveToFirebase();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Goals sugeneruoti!")),
+      const SnackBar(content: Text("Goals išsaugoti!")),
     );
 
-    Navigator.pop(context, goals);
+    Navigator.pop(context);
   }
 
   Widget numberInput(String label, TextEditingController controller) {
@@ -120,6 +192,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
             const Text(
               "Ką nori pagerinti?",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -146,18 +219,13 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             const SizedBox(height: 20),
 
             if (fitness) ...[
-
-              const Text(
-                "Pasirink sporto tipą:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              const Text("Pasirink sporto tipą:", style: TextStyle(fontWeight: FontWeight.bold)),
 
               CheckboxListTile(
                 title: const Text("Bėgimas"),
                 value: running,
                 onChanged: (val) => setState(() => running = val!),
               ),
-
               if (running)
                 numberInput("Kiek km per savaitę?", runningKmController),
 
@@ -166,7 +234,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
                 value: gym,
                 onChanged: (val) => setState(() => gym = val!),
               ),
-
               if (gym)
                 numberInput("Kiek kartų per savaitę?", gymDaysController),
 
@@ -175,7 +242,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
                 value: walking,
                 onChanged: (val) => setState(() => walking = val!),
               ),
-
               if (walking)
                 numberInput("Kiek žingsnių per dieną?", walkingStepsController),
             ],
@@ -192,7 +258,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: submit,
-                child: const Text("Išsaugoti ir generuoti dienos užduotis"),
+                child: const Text("Išsaugoti ir generuoti goals"),
               ),
             ),
           ],

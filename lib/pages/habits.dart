@@ -16,7 +16,7 @@ class HabitsPage extends StatefulWidget {
 
 class _HabitsPageState extends State<HabitsPage> {
   final _repo = FirebaseDayLogRepository();
-  final String _userId = "Z7eXTV0WWQSeCrWrqbf0MQMEpBf2";
+  final String _userId = "IjzxGe4VFxVujewMV3nVzoCCWsG3";
 
   List<Habit> _habits = [];
   List<Goal> _goals = [];

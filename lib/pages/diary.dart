@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:before_after/before_after.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
@@ -16,6 +17,11 @@ class _DiaryPageState extends State<DiaryPage> {
   final DiaryRepository _repository = DiaryRepository();
   final String _userId = "test_user_123";
   
+
+  // Selection Mode (Nuotraukų trynimui)
+  bool _isSelectionMode = false;
+  Set<String> _selectedForDeletion = {};
+
   // Image variables
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
@@ -424,6 +430,61 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
+  Future<void> _deleteSelectedImages(List<DiaryEntryModel> memories) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.yellow)),
+    );
+
+    try {
+      for (String id in _selectedForDeletion) {
+        final entry = memories.firstWhere((e) => e.id == id);
+        
+        if (entry.imageUrl != null && entry.imageUrl!.isNotEmpty) {
+          try {
+            await FirebaseStorage.instance.refFromURL(entry.imageUrl!).delete();
+          } catch (e) {
+            debugPrint("Nepavyko ištrinti failo iš Storage: $e");
+          }
+        }
+
+        final updatedEntry = DiaryEntryModel(
+          id: entry.id,
+          createdAt: entry.createdAt,
+          mood: entry.mood,
+          highlight: entry.highlight,
+          better: entry.better,
+          gratitude: entry.gratitude,
+          diaryText: entry.diaryText,
+          preview: entry.preview,
+          imageUrl: null,
+        );
+        
+        await _repository.addEntry(_userId, updatedEntry);
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      setState(() {
+        _isSelectionMode = false;
+        _selectedForDeletion.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Nuotraukos sėkmingai ištrintos!"), backgroundColor: Colors.green),
+      );
+      
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Klaida trinant nuotraukas: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   // memories tab
   Widget _buildMemoriesTab(List<DiaryEntryModel> allEntries) {
     final memories = allEntries.where((e) => e.imageUrl != null && e.imageUrl!.isNotEmpty).toList();
@@ -440,89 +501,124 @@ class _DiaryPageState extends State<DiaryPage> {
     }
 
     final today = DateTime.now();
-    DiaryEntryModel? specialMemory;
-    String memoryTitle = "";
+    DiaryEntryModel? memoryFromToday;
+    DiaryEntryModel? pastMemory;
+    String singleTitle = "";
+    String comparisonTitle = "";
 
+    try { memoryFromToday = memories.firstWhere((e) => e.createdAt.year == today.year && e.createdAt.month == today.month && e.createdAt.day == today.day); } catch (_) {}
     try {
-      specialMemory = memories.firstWhere((e) => 
-        e.createdAt.year == today.year - 1 && 
-        e.createdAt.month == today.month && 
-        e.createdAt.day == today.day
-      );
-      memoryTitle = "Lygiai prieš 1 metus...";
+      pastMemory = memories.firstWhere((e) => e.createdAt.year == today.year - 1 && e.createdAt.month == today.month && e.createdAt.day == today.day);
+      singleTitle = "Lygiai prieš 1 metus..."; comparisonTitle = "1 Metų Progresas!";
     } catch (_) {}
 
-    if (specialMemory == null) {
+    if (pastMemory == null) {
       final oneMonthAgo = DateTime(today.year, today.month - 1, today.day);
       try {
-        specialMemory = memories.firstWhere((e) => 
-          e.createdAt.year == oneMonthAgo.year && 
-          e.createdAt.month == oneMonthAgo.month && 
-          e.createdAt.day == oneMonthAgo.day
-        );
-        memoryTitle = "Prieš 1 mėnesį šią dieną...";
+        pastMemory = memories.firstWhere((e) => e.createdAt.year == oneMonthAgo.year && e.createdAt.month == oneMonthAgo.month && e.createdAt.day == oneMonthAgo.day);
+        singleTitle = "Prieš 1 mėnesį šią dieną..."; comparisonTitle = "1 Mėnesio Progresas!";
       } catch (_) {}
     }
 
     return Column(
       children:[
-        if (specialMemory != null) 
-          _buildSpecialMemoryCard(specialMemory, memoryTitle),
+        if (_isSelectionMode)
+          Container(
+            color: Colors.yellow[300],
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children:[
+                Text(
+                  "${_selectedForDeletion.length} pasirinkta", 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                ),
+                Row(
+                  children:[
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        if (_selectedForDeletion.isNotEmpty) {
+                          _deleteSelectedImages(memories);
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.black),
+                      onPressed: () => setState(() {
+                        _isSelectionMode = false;
+                        _selectedForDeletion.clear();
+                      }),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+        if (!_isSelectionMode) ...[
+          if (memoryFromToday != null && pastMemory != null && memoryFromToday.id != pastMemory.id)
+            _buildComparisonPreviewCard(pastMemory, memoryFromToday, comparisonTitle)
+          else if (pastMemory != null) 
+            _buildSpecialMemoryCard(pastMemory, singleTitle),
+        ],
 
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.all(4),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3, 
-              crossAxisSpacing: 4,
-              mainAxisSpacing: 4,
-              childAspectRatio: 0.8,
+              crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4, childAspectRatio: 0.8,
             ),
             itemCount: memories.length,
             itemBuilder: (context, index) {
               final entry = memories[index];
+              final isSelected = _selectedForDeletion.contains(entry.id);
+
               return GestureDetector(
-                onTap: () => _showEntryDialog(entry),
+                onLongPress: () {
+                  setState(() {
+                    _isSelectionMode = true;
+                    _selectedForDeletion.add(entry.id);
+                  });
+                },
+                onTap: () {
+                  if (_isSelectionMode) {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedForDeletion.remove(entry.id);
+                        if (_selectedForDeletion.isEmpty) _isSelectionMode = false;
+                      } else {
+                        _selectedForDeletion.add(entry.id);
+                      }
+                    });
+                  } else {
+                    _showEntryDialog(entry);
+                  }
+                },
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Stack(
                     fit: StackFit.expand,
                     children:[
-                      Image.network(
-                        entry.imageUrl!,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.grey[200],
-                            child: const Center(child: CircularProgressIndicator(color: Colors.yellow)),
-                          );
-                        },
-                      ),
+                      Image.network(entry.imageUrl!, fit: BoxFit.cover),
+                      
                       Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
+                        bottom: 0, left: 0, right: 0,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors:[Colors.black87, Colors.transparent],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                            ),
-                          ),
-                          child: Text(
-                            _formatDate(entry.createdAt),
-                            style: const TextStyle(
-                              color: Colors.white, 
-                              fontSize: 11, 
-                              fontWeight: FontWeight.bold
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          color: Colors.black54,
+                          child: Text(_formatDate(entry.createdAt), style: const TextStyle(color: Colors.white, fontSize: 11), textAlign: TextAlign.center),
                         ),
                       ),
+
+                      if (_isSelectionMode)
+                        Container(
+                          color: isSelected ? Colors.black54 : Colors.black12,
+                          alignment: Alignment.center,
+                          child: isSelected 
+                              ? const Icon(Icons.check_circle, color: Colors.yellow, size: 36)
+                              : const Icon(Icons.circle_outlined, color: Colors.white70, size: 36),
+                        ),
                     ],
                   ),
                 ),
@@ -531,6 +627,53 @@ class _DiaryPageState extends State<DiaryPage> {
           ),
         ),
       ],
+    );
+  }
+
+
+  Widget _buildComparisonPreviewCard(DiaryEntryModel beforeEntry, DiaryEntryModel afterEntry, String title) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => FullScreenComparisonPage(
+            beforeEntry: beforeEntry,
+            afterEntry: afterEntry,
+            title: title,
+          ),
+        ));
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        height: 120,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const[BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+          image: DecorationImage(
+            image: NetworkImage(afterEntry.imageUrl!),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children:[
+              const Icon(Icons.compare_arrows, color: Colors.yellow, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "Paspauskite, kad palygintumėte!",
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -722,4 +865,77 @@ class _DiaryPageState extends State<DiaryPage> {
       ),
     );
   }
+}
+
+class FullScreenComparisonPage extends StatefulWidget {
+  final DiaryEntryModel beforeEntry;
+  final DiaryEntryModel afterEntry;
+  final String title;
+
+  const FullScreenComparisonPage({
+    super.key,
+    required this.beforeEntry,
+    required this.afterEntry,
+    required this.title,
+  });
+
+  @override
+  State<FullScreenComparisonPage> createState() => _FullScreenComparisonPageState();
+}
+
+class _FullScreenComparisonPageState extends State<FullScreenComparisonPage> {
+  double _sliderValue = 0.5;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(widget.title),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: AspectRatio(
+          aspectRatio: 3 / 4,
+          child: BeforeAfter(
+            value: _sliderValue,
+            before: Image.network(widget.beforeEntry.imageUrl!, fit: BoxFit.cover),
+            after: Image.network(widget.afterEntry.imageUrl!, fit: BoxFit.cover),
+            trackColor: Colors.yellow,
+            thumbColor: Colors.yellow,
+            onValueChanged: (value) {
+              setState(() => _sliderValue = value);
+            },
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const[
+              Text("PRIEŠ", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              Text("PO (ŠIANDIEN)", style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SliderClipper extends CustomClipper<Rect> {
+  final double position;
+  _SliderClipper(this.position);
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(0, 0, size.width * position, size.height);
+  }
+
+  @override
+  bool shouldReclip(_SliderClipper oldClipper) => position != oldClipper.position;
 }

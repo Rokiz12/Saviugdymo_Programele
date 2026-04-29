@@ -9,6 +9,7 @@ class Habit {
   final List<String>? options;
   final bool archived;
   final bool systemOnly;
+  final String? icon;
 
   const Habit({
     required this.id,
@@ -19,6 +20,7 @@ class Habit {
     this.options,
     this.archived = false,
     this.systemOnly = false,
+    this.icon,
 });
 
   Habit copyWith({
@@ -29,6 +31,7 @@ class Habit {
     int? max,
     List<String>? options,
     bool? archived,
+    String? icon,
 }) {
     return Habit(
       id: id?? this.id,
@@ -38,6 +41,7 @@ class Habit {
       max: max?? this.max,
       options: options?? this.options,
       archived: archived?? this.archived,
+      icon: icon?? this.icon,
     );
   }
 
@@ -49,6 +53,7 @@ class Habit {
     'max': max,
     'options': options,
     'archived': archived,
+    'icon': icon,
   };
 
 
@@ -60,5 +65,6 @@ class Habit {
     max: json['max'] as int?,
     options: (json['options'] as List?)?.cast<String>(),
     archived: (json['archived'] as bool?) ?? false,
+    icon: json['icon'] as String?,
   );
 }

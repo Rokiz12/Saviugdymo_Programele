@@ -32,7 +32,6 @@ abstract class DayLogRepository {
 }
 
 
-//  FIREBASE IMPLEMENTATION (REAL ONLINE STORAGE)
 
 class FirebaseDayLogRepository implements DayLogRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;

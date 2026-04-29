@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'pages/combined_avatar_and_collection.dart';
 import 'pages/diary.dart';
+import 'pages/statistics.dart';
 import 'pages/habits.dart';
 import 'pages/settings.dart';
 import 'pages/login_page.dart';
@@ -12,6 +13,7 @@ import 'services/reward_notifier.dart';
 import 'services/reward_service.dart';
 import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
+import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -73,7 +75,8 @@ class _MainScreenState extends State<MainScreen>
 
     pages = [
       CombinedAvatarAndCollectionPage(userId: widget.userId),
-      HabitsPage(),
+      StatisticsPage(userId: widget.userId),
+      HabitsPage(userId: widget.userId),
       DiaryPage(),
     ];
 
@@ -86,6 +89,7 @@ class _MainScreenState extends State<MainScreen>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      FCMService.init(widget.userId);
       context.read<RewardNotifier>().addListener(_onRewardChanged);
       _checkDailyReward();
     });
@@ -138,7 +142,8 @@ class _MainScreenState extends State<MainScreen>
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Avataras"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Statistikos"),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Statistikos"),
+          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
         ],
       ),

@@ -274,7 +274,11 @@ class _PetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = pet.images['collection'] ??
+    final duplicateCount = userPet?.duplicateCount ?? 0;
+
+    final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
+
+    final imageUrl = pet.images[imageKey] ??
         pet.images.values.firstOrNull ??
         '';
 
@@ -387,7 +391,11 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = widget.pet.images['collection'] ??
+    final duplicateCount = widget.userPet?.duplicateCount ?? 0;
+
+    final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
+
+    final imageUrl = widget.pet.images[imageKey] ??
         widget.pet.images.values.firstOrNull ??
         '';
 

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'questionaire.dart';
+import '../widgets/custom_app_bar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -8,19 +11,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Nustatymai',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.yellow,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        centerTitle: true,
-      ),
+      appBar: const CustomAppBar(title: "Nustatymai"),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
@@ -39,7 +30,7 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.email,
                 iconColor: Colors.blue,
                 title: "El. paštas",
-                subtitle: "vartotojas@email.com",
+                subtitle: FirebaseAuth.instance.currentUser?.email,
                 onTap: () {},
               ),
             ],
@@ -112,6 +103,20 @@ class SettingsPage extends StatelessWidget {
           _SettingsCard(
             title: "Paskyra",
             children: [
+              _SettingsTile(
+                icon: Icons.quiz,
+                iconColor: Colors.red,
+                title: "Perdaryti norų klausimyną",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const QuestionnaireScreen(),
+                    ),
+                  );
+                },
+              ),
+
               _SettingsTile(
                 icon: Icons.logout,
                 iconColor: Colors.red,

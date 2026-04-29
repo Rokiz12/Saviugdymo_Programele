@@ -7,6 +7,7 @@ import 'package:pvp/features/habits/dialogs/habitEditorDialog.dart';
 import 'package:pvp/features/habits/dialogs/goalEditDialog.dart';
 import '../services/sound_service.dart';
 import '../features/habits/utils/habitIcons.dart';
+import '../widgets/custom_app_bar.dart';
 
 class HabitsPage extends StatefulWidget {
   final String userId;
@@ -363,11 +364,8 @@ class _HabitsPageState extends State<HabitsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Įpročiai"),
-        backgroundColor: Colors.yellow,
-        centerTitle: true,
-      ),
+
+      appBar: const CustomAppBar(title: "Įpročiai"),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

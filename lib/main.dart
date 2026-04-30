@@ -81,7 +81,7 @@ class _MainScreenState extends State<MainScreen>
     ];
 
     tabController = TabController(
-        length: 3, vsync: this, initialIndex: selectedIndex);
+        length: 4, vsync: this, initialIndex: selectedIndex);
     tabController.addListener(() {
       if (tabController.index != selectedIndex) {
         setState(() => selectedIndex = tabController.index);

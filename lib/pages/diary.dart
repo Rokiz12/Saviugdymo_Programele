@@ -99,7 +99,6 @@ class _DiaryPageState extends State<DiaryPage> {
       SoundService.playSadDiary();
     }
 
-    final now = DateTime.now();
     final preview = textControllers[0].text.isNotEmpty
         ? textControllers[0].text
         : (textControllers[2].text.isNotEmpty ? textControllers[2].text : "Tuščias įrašas");

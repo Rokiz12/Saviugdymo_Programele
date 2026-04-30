@@ -8,6 +8,80 @@ class HabitEditorDialog extends StatefulWidget {
   @override
   State<HabitEditorDialog> createState() => _HabitEditorDialogState();
 }
+class IconPickerField extends StatefulWidget {
+  final String? initial;
+  final ValueChanged<String?> onChanged;
+  const IconPickerField({super.key, this.initial, required this.onChanged});
+
+  @override
+  State<IconPickerField> createState() => _IconPickerFieldState();
+}
+
+class _IconPickerFieldState extends State<IconPickerField> {
+  static const _icons = {
+    'run':        Icons.directions_run,
+    'water':      Icons.water_drop,
+    'book':       Icons.menu_book,
+    'sleep':      Icons.bedtime,
+    'food':       Icons.restaurant,
+    'heart':      Icons.favorite,
+    'gym':        Icons.fitness_center,
+    'meditation': Icons.self_improvement,
+    'music':      Icons.music_note,
+    'code':       Icons.code,
+    'study':      Icons.school,
+    'money':      Icons.attach_money,
+    'walk':       Icons.directions_walk,
+    'bike':       Icons.directions_bike,
+    'clean':      Icons.cleaning_services,
+    'journal':    Icons.edit_note,
+  };
+
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Ikonėlė", style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _icons.entries.map((e) {
+            final isSelected = _selected == e.key;
+            return GestureDetector(
+              onTap: () {
+                setState(() => _selected = e.key);
+                widget.onChanged(e.key);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.yellow : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? Colors.yellow.shade700 : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Icon(e.value, size: 24),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
 
 class _HabitEditorDialogState extends State<HabitEditorDialog> {
   final _nameCtrl = TextEditingController();
@@ -16,6 +90,8 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
   final _optionsCtrl = TextEditingController();
 
   RatingKind _kind = RatingKind.checkbox;
+  String? _selectedIcon;
+
 
   @override
   void initState() {
@@ -25,6 +101,8 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
     if (h != null) {
       _nameCtrl.text = h.name;
       _kind = h.kind;
+      _selectedIcon = h.icon;
+
 
       if (h.min != null) _minCtrl.text = "${h.min}";
       if (h.max != null) _maxCtrl.text = "${h.max}";
@@ -55,6 +133,12 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
             TextField(
               controller: _nameCtrl,
               decoration: const InputDecoration(labelText: "Pavadinimas"),
+            ),
+            const SizedBox(height: 16),
+
+            IconPickerField(
+              initial: _selectedIcon,
+              onChanged: (key) => setState(() => _selectedIcon = key),
             ),
             const SizedBox(height: 12),
 
@@ -147,6 +231,7 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
               min: min,
               max: max,
               options: opts,
+              icon: _selectedIcon,
             );
 
             Navigator.pop(context, habit);

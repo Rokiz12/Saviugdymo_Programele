@@ -36,6 +36,23 @@ class DiaryRepository {
     });
   }
 
+  // skaitymas pagal datų diapazoną
+  Future<List<DiaryEntryModel>> getEntriesForDateRange(
+    String userId,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final snapshot = await _diaryRef(userId)
+        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => DiaryEntryModel.fromFirestore(doc))
+        .toList();
+  }
+
   // trinimas
   Future<void> deleteEntry(String userId, String entryId) async {
     await _diaryRef(userId).doc(entryId).delete();

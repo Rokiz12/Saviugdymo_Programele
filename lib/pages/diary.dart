@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:before_after/before_after.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:pvp/services/sound_service.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -24,14 +25,11 @@ class _DiaryPageState extends State<DiaryPage> {
   
   final String _userId = FirebaseAuth.instance.currentUser!.uid;
 
-
   bool _isSelectionMode = false;
   Set<String> _selectedForDeletion = {};
 
-
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
-
 
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDay;
@@ -48,7 +46,7 @@ class _DiaryPageState extends State<DiaryPage> {
     TextEditingController(), 
   ];
 
-  final List<String> _weekDays = ['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
+  final List<String> _weekDays =['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
   final List<String> _moods =['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
   final List<String> _moodEmojis =['😀', '🙂', '😐', '😢', '😭'];
 
@@ -60,8 +58,7 @@ class _DiaryPageState extends State<DiaryPage> {
 
   Future<void> _loadQuestions() async {
     try {
-      final questions = await _questionRepository.getOneRandomFromEachCategory(['highlight', 'reflect', 'gratitude'],
-      );
+      final questions = await _questionRepository.getOneRandomFromEachCategory(['highlight', 'reflect', 'gratitude']);
       setState(() {
         _currentQuestions = questions;
         _questionsLoaded = true;
@@ -79,7 +76,6 @@ class _DiaryPageState extends State<DiaryPage> {
     for (var c in textControllers) c.dispose();
     super.dispose();
   }
-
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -135,7 +131,6 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
-
   Future<void> _saveEntry() async {
     if (selectedMood.isEmpty) {
       if (!mounted) return;
@@ -144,6 +139,14 @@ class _DiaryPageState extends State<DiaryPage> {
       );
       return;
     }
+
+    // --- SOUND LOGIC (Merged from Teammate's code) ---
+    if (_moods.indexOf(selectedMood) <= 1) {
+      SoundService.playHappyDiary();
+    } else {
+      SoundService.playSadDiary();
+    }
+    // -------------------------------------------------
 
     final navigator = Navigator.of(context);
 
@@ -195,7 +198,6 @@ class _DiaryPageState extends State<DiaryPage> {
 
       navigator.pop();
 
-
       setState(() {
         selectedMood = "";
         _selectedImage = null;
@@ -220,7 +222,6 @@ class _DiaryPageState extends State<DiaryPage> {
         );
       }
 
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         DefaultTabController.of(context)?.animateTo(1);
@@ -235,7 +236,6 @@ class _DiaryPageState extends State<DiaryPage> {
       }
     }
   }
-
 
   void _groupEntries(List<DiaryEntryModel> entries) {
     _entriesByDate = {};
@@ -260,8 +260,6 @@ class _DiaryPageState extends State<DiaryPage> {
   String _getMonthName(int m) =>['Sausis', 'Vasaris', 'Kovas', 'Balandis', 'Gegužė', 'Birželis',
         'Liepa', 'Rugpjūtis', 'Rugsėjis', 'Spalis', 'Lapkritis', 'Gruodis'][m - 1];
 
-
-
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -284,7 +282,7 @@ class _DiaryPageState extends State<DiaryPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final entries = snapshot.data ??[];
+            final entries = snapshot.data ?? [];
             _groupEntries(entries);
 
             return TabBarView(
@@ -344,7 +342,6 @@ class _DiaryPageState extends State<DiaryPage> {
           ),
           const SizedBox(height: 24),
           
-          
           ...[
             for (int i = 0; i < _currentQuestions.length; i++)
               _buildField(
@@ -354,11 +351,9 @@ class _DiaryPageState extends State<DiaryPage> {
               ),
           ],
           
-          
           _buildField("Laisvas dienoraštis", 3, maxLines: 4),
           
           const SizedBox(height: 24),
-
           
           const Text(
             "Prisegti nuotrauką (neprivaloma)",
@@ -495,7 +490,6 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
-
   Future<void> _deleteSelectedImages(List<DiaryEntryModel> memories) async {
     showDialog(
       context: context,
@@ -551,8 +545,6 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
-  // memories
-  
   Widget _buildMemoriesTab(List<DiaryEntryModel> allEntries) {
     final memories = allEntries.where((e) => e.imageUrl != null && e.imageUrl!.isNotEmpty).toList();
     memories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -932,7 +924,6 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 }
-
 
 class FullScreenComparisonPage extends StatefulWidget {
   final DiaryEntryModel beforeEntry;

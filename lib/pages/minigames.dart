@@ -8,6 +8,7 @@ import '../data/repositories/user_repository.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../services/sound_service.dart';
 
 class CollectionPage extends StatefulWidget {
   final String userId;
@@ -378,6 +379,26 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
     setState(() => _isEquipping = true);
     try {
       await widget.userRepository.equipPet(widget.userId, widget.pet.id);
+
+      switch (widget.pet.name) {
+        case 'Cat':
+          SoundService.playCat();
+          break;
+        case 'Chicken':
+          SoundService.playCock();
+          break;
+        case 'Mouse':
+          SoundService.playMouse();
+          break;
+        case 'Worm':
+          SoundService.playWorm();
+          break;
+          default:
+            break;
+      }
+
+
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(

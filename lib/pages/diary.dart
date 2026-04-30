@@ -5,6 +5,11 @@ import 'package:before_after/before_after.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/custom_app_bar.dart';
+import '../data/repositories/user_repository.dart';
+import '../data/repositories/diary_question_repository.dart';
+import '../data/models/diary_question_model.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -15,34 +20,59 @@ class DiaryPage extends StatefulWidget {
 
 class _DiaryPageState extends State<DiaryPage> {
   final DiaryRepository _repository = DiaryRepository();
-  final String _userId = "test_user_123";
+  final DiaryQuestionRepository _questionRepository = DiaryQuestionRepository();
   
+  final String _userId = FirebaseAuth.instance.currentUser!.uid;
 
-  // Selection Mode (Nuotraukų trynimui)
+
   bool _isSelectionMode = false;
   Set<String> _selectedForDeletion = {};
 
-  // Image variables
+
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
-  // Calendar
+
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDay;
   Map<DateTime, List<DiaryEntryModel>> _entriesByDate = {};
 
-  // Form
   String selectedMood = "";
+  List<DiaryQuestionModel> _currentQuestions =[];
+  bool _questionsLoaded = false;
+  
   final textControllers =[
-    TextEditingController(), // 0: highlight
-    TextEditingController(), // 1: better
-    TextEditingController(), // 2: gratitude
-    TextEditingController(), // 3: journal
+    TextEditingController(), 
+    TextEditingController(), 
+    TextEditingController(), 
+    TextEditingController(), 
   ];
 
-  final List<String> _weekDays =['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
+  final List<String> _weekDays = ['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
   final List<String> _moods =['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
-  final List<String> _moodEmojis = ['😀', '🙂', '😐', '😢', '😭'];
+  final List<String> _moodEmojis =['😀', '🙂', '😐', '😢', '😭'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    try {
+      final questions = await _questionRepository.getOneRandomFromEachCategory(['highlight', 'reflect', 'gratitude'],
+      );
+      setState(() {
+        _currentQuestions = questions;
+        _questionsLoaded = true;
+      });
+    } catch (e) {
+      debugPrint("Error loading questions: $e");
+      setState(() {
+        _questionsLoaded = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -50,7 +80,6 @@ class _DiaryPageState extends State<DiaryPage> {
     super.dispose();
   }
 
-  // image picking fucntions
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -106,7 +135,6 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
-  // save entry function
 
   Future<void> _saveEntry() async {
     if (selectedMood.isEmpty) {
@@ -119,12 +147,10 @@ class _DiaryPageState extends State<DiaryPage> {
 
     final navigator = Navigator.of(context);
 
-    // show loading
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) =>
-          const Center(child: CircularProgressIndicator(color: Colors.yellow)),
+      builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.yellow)),
     );
 
     final now = DateTime.now();
@@ -132,7 +158,6 @@ class _DiaryPageState extends State<DiaryPage> {
     String? uploadedImageUrl;
 
     try {
-      // upload image
       if (_selectedImage != null) {
         final ref = FirebaseStorage.instance
             .ref()
@@ -161,37 +186,41 @@ class _DiaryPageState extends State<DiaryPage> {
           better: textControllers[1].text,
           gratitude: textControllers[2].text,
           diaryText: textControllers[3].text,
-          preview: preview.length > 50
-              ? '${preview.substring(0, 47)}...'
-              : preview,
+          preview: preview.length > 50 ? '${preview.substring(0, 47)}...' : preview,
           imageUrl: uploadedImageUrl,
         ),
       );
 
       if (!mounted) return;
 
-      // close loading
       navigator.pop();
+
 
       setState(() {
         selectedMood = "";
         _selectedImage = null;
       });
-
       for (var c in textControllers) {
         c.clear();
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Įrašas išsaugotas!"),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text("Įrašas išsaugotas!"), backgroundColor: Colors.green),
         );
       }
 
-      // delay tab switch to next frame
+      _loadQuestions(); 
+      final userRepo = UserRepository();
+      final gotXp = await userRepo.tryGiveDiaryXp(_userId, 10);
+
+      if (gotXp && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Gavai +10 XP!", style: TextStyle(fontWeight: FontWeight.bold))),
+        );
+      }
+
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         DefaultTabController.of(context)?.animateTo(1);
@@ -199,7 +228,6 @@ class _DiaryPageState extends State<DiaryPage> {
       
     } catch (e) {
       if (mounted) navigator.pop();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Klaida: $e")),
@@ -208,7 +236,6 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
-  // calendar helpers
 
   void _groupEntries(List<DiaryEntryModel> entries) {
     _entriesByDate = {};
@@ -233,16 +260,15 @@ class _DiaryPageState extends State<DiaryPage> {
   String _getMonthName(int m) =>['Sausis', 'Vasaris', 'Kovas', 'Balandis', 'Gegužė', 'Birželis',
         'Liepa', 'Rugpjūtis', 'Rugsėjis', 'Spalis', 'Lapkritis', 'Gruodis'][m - 1];
 
-  // ui widgets
+
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Dienoraštis'),
-          backgroundColor: Colors.yellow,
+        appBar: CustomAppBar(
+          title: 'Dienoraštis',
           bottom: const TabBar(
             tabs:[
               Tab(icon: Icon(Icons.add), text: "Naujas"),
@@ -275,6 +301,36 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Widget _buildNewEntryTab() {
+    if (!_questionsLoaded) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_currentQuestions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children:[
+              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                "Atsiprašome, klausimai nėra prieinami",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadQuestions,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Bandyti dar kartą"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -287,14 +343,23 @@ class _DiaryPageState extends State<DiaryPage> {
             children: List.generate(5, (i) => _moodBtn(i)),
           ),
           const SizedBox(height: 24),
-          _buildField("Kas gero?", 0),
-          _buildField("Galėjo būti geriau?", 1),
-          _buildField("Už ką dėkingas?", 2),
+          
+          
+          ...[
+            for (int i = 0; i < _currentQuestions.length; i++)
+              _buildField(
+                _currentQuestions[i].question,
+                i,
+                maxLines: _currentQuestions[i].maxLines,
+              ),
+          ],
+          
+          
           _buildField("Laisvas dienoraštis", 3, maxLines: 4),
           
           const SizedBox(height: 24),
 
-          // image add 
+          
           const Text(
             "Prisegti nuotrauką (neprivaloma)",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -430,6 +495,7 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
+
   Future<void> _deleteSelectedImages(List<DiaryEntryModel> memories) async {
     showDialog(
       context: context,
@@ -485,7 +551,8 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
-  // memories tab
+  // memories
+  
   Widget _buildMemoriesTab(List<DiaryEntryModel> allEntries) {
     final memories = allEntries.where((e) => e.imageUrl != null && e.imageUrl!.isNotEmpty).toList();
     memories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -630,7 +697,6 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
-
   Widget _buildComparisonPreviewCard(DiaryEntryModel beforeEntry, DiaryEntryModel afterEntry, String title) {
     return GestureDetector(
       onTap: () {
@@ -702,7 +768,7 @@ class _DiaryPageState extends State<DiaryPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: const LinearGradient(
-              colors: [Colors.black87, Colors.transparent],
+              colors:[Colors.black87, Colors.transparent],
               begin: Alignment.bottomCenter,
               end: Alignment.center,
             )
@@ -867,6 +933,7 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 }
 
+
 class FullScreenComparisonPage extends StatefulWidget {
   final DiaryEntryModel beforeEntry;
   final DiaryEntryModel afterEntry;
@@ -925,17 +992,4 @@ class _FullScreenComparisonPageState extends State<FullScreenComparisonPage> {
       ),
     );
   }
-}
-
-class _SliderClipper extends CustomClipper<Rect> {
-  final double position;
-  _SliderClipper(this.position);
-
-  @override
-  Rect getClip(Size size) {
-    return Rect.fromLTRB(0, 0, size.width * position, size.height);
-  }
-
-  @override
-  bool shouldReclip(_SliderClipper oldClipper) => position != oldClipper.position;
 }

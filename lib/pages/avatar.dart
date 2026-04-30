@@ -5,6 +5,7 @@ import '../data/models/pet_model.dart';
 import '../data/repositories/user_repository.dart';
 import '../data/repositories/pet_repository.dart';
 import "package:cached_network_image/cached_network_image.dart";
+import '../data/repositories/quote_repository.dart';
 
 class AvatarPage extends StatefulWidget {
   final String userId;
@@ -18,12 +19,19 @@ class _AvatarPageState extends State<AvatarPage>
     with SingleTickerProviderStateMixin {
   final UserRepository _userRepository = UserRepository();
   final PetRepository _petRepository = PetRepository();
+  final QuoteRepository _quoteRepository = QuoteRepository();
 
   late AnimationController _floatingController;
   late Animation<double> _floatingAnimation;
   double _avatarScale = 1.0;
 
   late Future<(UserModel?, PetModel?)> _dataFuture;
+
+  // speech bubble state
+  List<String> _quotes =[];
+  String _currentQuote = '';
+  bool _bubbleVisible = false;
+  bool _quotesLoaded = false;
 
   @override
   void initState() {
@@ -39,6 +47,7 @@ class _AvatarPageState extends State<AvatarPage>
     );
 
     _dataFuture = _fetchData();
+    _loadQuotes();
   }
 
   Future<(UserModel?, PetModel?)> _fetchData() async {
@@ -51,6 +60,41 @@ class _AvatarPageState extends State<AvatarPage>
     }
 
     return (user, pet);
+  }
+
+  Future<void> _loadQuotes() async {
+    final quotes = await _quoteRepository.getQuotes();
+    if (mounted) {
+      setState(() {
+        _quotes = quotes;
+        _quotesLoaded = true;
+      });
+    }
+  }
+
+  void _onAvatarTap(String petName) {
+    if (!_quotesLoaded || _quotes.isEmpty) return;
+
+    // pick random quote
+    String newQuote = _currentQuote;
+    if (_quotes.length > 1) {
+      while (newQuote == _currentQuote) {
+        newQuote = _quotes[Random().nextInt(_quotes.length)];
+      }
+    } else {
+      newQuote = _quotes.first;
+    }
+
+    setState(() {
+      _currentQuote = newQuote;
+      _bubbleVisible = true;
+    });
+  }
+
+  void _dismissBubble() {
+    setState(() {
+      _bubbleVisible = false;
+    });
   }
 
   @override
@@ -94,12 +138,16 @@ class _AvatarPageState extends State<AvatarPage>
 
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
-        final imageUrl = pet?.images['collection'] ?? '';
+        final duplicateCount = petProgress?.duplicateCount ?? 0;
+        final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
+        
+        final imageUrl = pet?.images[imageKey] ??
+            pet?.images.values.firstOrNull ??
+            '';
+            
+        final streak = user.streak; 
 
-        // Daily streak 
-        final streak = 4;
-
-        // PAKEITIMAS ČIA: Išimtas Scaffold ir AppBar. Grąžinamas tik Container!
+        
         return Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -117,6 +165,7 @@ class _AvatarPageState extends State<AvatarPage>
               ),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children:[
                 const SizedBox(height: 32),
 
@@ -131,77 +180,139 @@ class _AvatarPageState extends State<AvatarPage>
 
                 const SizedBox(height: 24),
 
-                AnimatedBuilder(
-                  animation: _floatingAnimation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(0, _floatingAnimation.value),
-                      child: child,
-                    );
-                  },
-                  child: AnimatedScale(
-                    scale: _avatarScale,
-                    duration: const Duration(milliseconds: 150),
-                    curve: Curves.easeOutCubic,
-                    child: GestureDetector(
-                      onTapDown: (_) =>
-                          setState(() => _avatarScale = 0.92),
-                      onTapUp: (_) =>
-                          setState(() => _avatarScale = 1.0),
-                      onTapCancel: () =>
-                          setState(() => _avatarScale = 1.0),
-                      child: Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow:[
-                            BoxShadow(
-                                color: const Color.fromARGB(255, 170, 170, 170).withOpacity(0.4),
-                                blurRadius: 30,
-                                spreadRadius: 5,
-                                offset: const Offset(0, 10))
-                          ],
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children:[
-                            Container(
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                    colors:[Color.fromARGB(255, 216, 215, 216), Color.fromARGB(255, 161, 161, 161)]),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(6.0),
-                              child: ClipOval(
-                                child: imageUrl.isEmpty
-                                    ? const Icon(Icons.pets, size: 120)
-                                    : CachedNetworkImage(
-                                        imageUrl: imageUrl,
-                                        fit: BoxFit.cover,
-                                        width: 220,
-                                        height: 220,
-                                        memCacheWidth: 512,
-                                        memCacheHeight: 512,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                              child: CircularProgressIndicator(strokeWidth: 2),
-                                            ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(Icons.pets, size: 120),
+                
+                SizedBox(
+                  height: 290,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.bottomCenter,
+                    children:[
+                      Positioned(
+                        bottom: 0,
+                        child: AnimatedBuilder(
+                          animation: _floatingAnimation,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(0, _floatingAnimation.value),
+                              child: child,
+                            );
+                          },
+                          child: AnimatedScale(
+                            scale: _avatarScale,
+                            duration: const Duration(milliseconds: 150),
+                            curve: Curves.easeOutCubic,
+                            child: GestureDetector(
+                              onTapDown: (_) =>
+                                  setState(() => _avatarScale = 0.92),
+                              onTapUp: (_) {
+                                setState(() => _avatarScale = 1.0);
+                                if (_bubbleVisible) {
+                                  _dismissBubble();
+                                } else {
+                                  _onAvatarTap(petName);
+                                }
+                              },
+                              onTapCancel: () =>
+                                  setState(() => _avatarScale = 1.0),
+                              child: Container(
+                                width: 220,
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow:[
+                                    BoxShadow(
+                                      color: Colors.purpleAccent.withOpacity(0.4),
+                                      blurRadius: 30,
+                                      spreadRadius: 5,
+                                      offset: const Offset(0, 10),
+                                    )
+                                  ],
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children:[
+                                    Container(
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.purpleAccent,
+                                            Colors.deepPurple
+                                          ],
+                                        ),
                                       ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(6.0),
+                                      child: ClipOval(
+                                        child: imageUrl.isEmpty
+                                            ? const Icon(Icons.pets, size: 120)
+                                            : CachedNetworkImage( 
+                                                imageUrl: imageUrl,
+                                                fit: BoxFit.cover,
+                                                width: 220,
+                                                height: 220,
+                                                memCacheWidth: 512,
+                                                memCacheHeight: 512,
+                                                placeholder: (context, url) =>
+                                                    const Center(
+                                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                                    ),
+                                                errorWidget: (context, url, error) =>
+                                                    const Icon(Icons.pets, size: 120),
+                                              ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+
+                      // speech bubble
+                      Positioned(
+                        top: 0,
+                        child: AnimatedOpacity(
+                          opacity: _bubbleVisible ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: AnimatedSlide(
+                            offset: _bubbleVisible
+                                ? Offset.zero
+                                : const Offset(0, 0.08),
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            child: IgnorePointer(
+                              ignoring: !_bubbleVisible,
+                              child: _SpeechBubble(text: _currentQuote),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _quotesLoaded && _quotes.isNotEmpty
+                      ? Text(
+                    _bubbleVisible
+                        ? 'Paspausk, kad paslėptum'
+                        : 'Paspausk motyvacijai!',
+                    key: ValueKey(_bubbleVisible),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.purple.withOpacity(0.6),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                      : const SizedBox.shrink(),
+                ),
+
+                const SizedBox(height: 16),
 
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -209,8 +320,7 @@ class _AvatarPageState extends State<AvatarPage>
                   decoration: BoxDecoration(
                     color: Colors.purple.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border:
-                    Border.all(color: Colors.purple.withOpacity(0.3)),
+                    border: Border.all(color: Colors.purple.withOpacity(0.3)),
                   ),
                   child: Text(
                     petRarity,
@@ -259,10 +369,8 @@ class _AvatarPageState extends State<AvatarPage>
                         ),
                         const SizedBox(height: 16),
                         TweenAnimationBuilder<double>(
-                          tween:
-                          Tween<double>(begin: 0, end: progress),
-                          duration:
-                          const Duration(milliseconds: 1200),
+                          tween: Tween<double>(begin: 0, end: progress),
+                          duration: const Duration(milliseconds: 1200),
                           curve: Curves.easeOutCubic,
                           builder: (context, value, child) {
                             return Stack(
@@ -271,8 +379,7 @@ class _AvatarPageState extends State<AvatarPage>
                                   height: 18,
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade100,
-                                    borderRadius:
-                                    BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 FractionallySizedBox(
@@ -280,10 +387,8 @@ class _AvatarPageState extends State<AvatarPage>
                                   child: Container(
                                     height: 18,
                                     decoration: BoxDecoration(
-                                      borderRadius:
-                                      BorderRadius.circular(10),
-                                      gradient:
-                                      const LinearGradient(
+                                      borderRadius: BorderRadius.circular(10),
+                                      gradient: const LinearGradient(
                                         colors:[
                                           Colors.orangeAccent,
                                           Colors.deepOrange
@@ -340,6 +445,84 @@ class _AvatarPageState extends State<AvatarPage>
   }
 }
 
+
+
+class _SpeechBubble extends StatelessWidget {
+  final String text;
+
+  const _SpeechBubble({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children:[
+        Container(
+          constraints: const BoxConstraints(maxWidth: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow:[
+              BoxShadow(
+                color: Colors.purple.withOpacity(0.15),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+            border: Border.all(
+              color: Colors.purple.withOpacity(0.18),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2D3142),
+              height: 1.45,
+            ),
+          ),
+        ),
+
+        CustomPaint(
+          size: const Size(20, 10),
+          painter: _BubbleTailPainter(),
+        ),
+      ],
+    );
+  }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fillPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = Colors.purple.withOpacity(0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
@@ -362,7 +545,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
+        boxShadow:[
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
             blurRadius: 15,
@@ -371,10 +554,11 @@ class _StatCard extends StatelessWidget {
         ],
       ),
       child: Column(
-        children: [
+        children:[
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+            decoration:
+            BoxDecoration(color: bgColor, shape: BoxShape.circle),
             child: Icon(icon, size: 28, color: iconColor),
           ),
           const SizedBox(height: 12),

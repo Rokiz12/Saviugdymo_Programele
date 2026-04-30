@@ -5,9 +5,11 @@ import 'package:pvp/features/habits/models/models.dart';
 import 'package:pvp/features/habits/utils/goalProgress.dart';
 import 'package:pvp/features/habits/dialogs/habitEditorDialog.dart';
 import 'package:pvp/features/habits/dialogs/goalEditDialog.dart';
+import '../widgets/custom_app_bar.dart';
 
 class HabitsPage extends StatefulWidget {
-  const HabitsPage({super.key});
+  final String userId;
+  const HabitsPage({super.key, required this.userId});
 
   @override
   State<HabitsPage> createState() => _HabitsPageState();
@@ -15,7 +17,6 @@ class HabitsPage extends StatefulWidget {
 
 class _HabitsPageState extends State<HabitsPage> {
   final _repo = FirebaseDayLogRepository();
-  final String _userId = "Z7eXTV0WWQSeCrWrqbf0MQMEpBf2";
 
   List<Habit> _habits = [];
   List<Goal> _goals = [];
@@ -41,15 +42,15 @@ class _HabitsPageState extends State<HabitsPage> {
   // DATA LOAD
 
   Future<void> _loadInitial() async {
-    final habits = await _repo.getHabits(userId: _userId);
-    final goals = await _repo.getGoals(userId: _userId);
+    final habits = await _repo.getHabits(userId: widget.userId);
+    final goals = await _repo.getGoals(userId: widget.userId);
 
     final now = DateTime.now().toUtc();
     final start = DateTime.utc(now.year, now.month, 1);
     final end = DateTime.utc(now.year, now.month + 1, 0);
 
     final monthLogs = await _repo.getLogsForRange(
-      userId: _userId,
+      userId: widget.userId,
       startInclusive: start,
       endInclusive: end,
     );
@@ -130,7 +131,7 @@ class _HabitsPageState extends State<HabitsPage> {
     );
     if (habit == null) return;
 
-    await _repo.addHabit(userId: _userId, habit: habit);
+    await _repo.addHabit(userId: widget.userId, habit: habit);
 
     setState(() => _habits.add(habit));
 
@@ -145,7 +146,7 @@ class _HabitsPageState extends State<HabitsPage> {
     );
     if (updated == null) return;
 
-    await _repo.updateHabit(userId: _userId, habit: updated);
+    await _repo.updateHabit(userId: widget.userId, habit: updated);
 
     setState(() {
       final i = _habits.indexWhere((x) => x.id == updated.id);
@@ -175,7 +176,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
     if (confirm != true) return;
 
-    await _repo.deleteHabit(userId: _userId, habitId: h.id);
+    await _repo.deleteHabit(userId: widget.userId, habitId: h.id);
 
     setState(() {
       _habits.removeWhere((x) => x.id == h.id);
@@ -195,7 +196,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
     if (goal == null) return;
 
-    await _repo.addGoal(userId: _userId, goal: goal);
+    await _repo.addGoal(userId: widget.userId, goal: goal);
 
     setState(() => _goals.add(goal));
   }
@@ -211,7 +212,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
     if (updated == null) return;
 
-    await _repo.updateGoal(userId: _userId, goal: updated);
+    await _repo.updateGoal(userId: widget.userId, goal: updated);
 
     setState(() {
       final i = _goals.indexWhere((x) => x.id == updated.id);
@@ -234,7 +235,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
     if (confirm != true) return;
 
-    await _repo.deleteGoal(userId: _userId, goalId: g.id);
+    await _repo.deleteGoal(userId: widget.userId, goalId: g.id);
 
     setState(() => _goals.removeWhere((x) => x.id == g.id));
   }
@@ -294,7 +295,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
     setState(() => _today = newLog);
 
-    _repo.upsertDayLog(userId: _userId, log: newLog);
+    _repo.upsertDayLog(userId: widget.userId, log: newLog);
   }
 
   // AUTO HABIT TRACKER
@@ -308,7 +309,7 @@ class _HabitsPageState extends State<HabitsPage> {
     );
 
     if (!_habits.any((h) => h.id == auto.id)) {
-      await _repo.addHabit(userId: _userId, habit: auto);
+      await _repo.addHabit(userId: widget.userId, habit: auto);
       setState(() => _habits.add(auto));
     }
   }
@@ -328,7 +329,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
         log = log.setValue('app2min', const BoolValue(true));
 
-        await _repo.upsertDayLog(userId: _userId, log: log);
+        await _repo.upsertDayLog(userId: widget.userId, log: log);
 
         final now = DateTime.now().toUtc();
         if (day.year == now.year && day.month == now.month && day.day == now.day) {
@@ -355,11 +356,8 @@ class _HabitsPageState extends State<HabitsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Įpročiai"),
-        backgroundColor: Colors.yellow,
-        centerTitle: true,
-      ),
+
+      appBar: const CustomAppBar(title: "Įpročiai"),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -369,8 +367,6 @@ class _HabitsPageState extends State<HabitsPage> {
             _buildHabitsSection(),
 
             const SizedBox(height: 30),
-
-            _buildMonthPlaceholder(),
 
             const SizedBox(height: 30),
 
@@ -402,22 +398,38 @@ class _HabitsPageState extends State<HabitsPage> {
               final h = _habits[index];
               final v = _today!.entries[h.id];
 
+
               return SizedBox(
                 height: 44,
-                child: ListTile(
-                  dense: true,
-                  minVerticalPadding: 0,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  visualDensity: const VisualDensity(vertical: -1),
+                child: Row(
+                  children: [
+                    // LEFT: habit name
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: h.systemOnly ? null : () => _editHabit(h),
+                        onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              h.name,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
-                  title: Text(h.name, style: const TextStyle(fontSize: 16)),
-
-                  onTap: h.systemOnly ? null : () => _editHabit(h),
-                  onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
-
-                  trailing: _buildTrailingFor(h, v),
+                    // RIGHT: indicator / controls
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _buildTrailingFor(h, v),
+                    ),
+                  ],
                 ),
               );
+
             },
           ),
 
@@ -433,19 +445,6 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
-  Widget _buildMonthPlaceholder() {
-    return Container(
-      height: 150,
-      width: 450,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Center(
-        child: Text("Month or weeks table placeholder"),
-      ),
-    );
-  }
 
   Widget _buildGoalsSection() {
     return Container(
@@ -521,31 +520,53 @@ class _HabitsPageState extends State<HabitsPage> {
           onChanged: (val) => _setValue(h, BoolValue(val ?? false)),
         );
 
+
       case RatingKind.number:
         final numVal = (v is NumberValue) ? v.value : (h.min ?? 0);
 
-        return SizedBox(
-          width: 96,
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.remove),
-                onPressed: () => _setValue(
-                  h,
-                  NumberValue((numVal - 5).clamp(h.min ?? -999999, h.max ?? 999999)),
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove),
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(),
+              onPressed: () => _setValue(
+                h,
+                NumberValue((numVal - 5).clamp(
+                  h.min ?? -999999,
+                  h.max ?? 999999,
+                )),
+              ),
+            ),
+            SizedBox(
+              width: 24,
+              child: Center(
+                child: Text(
+                  "$numVal",
+                  style: const TextStyle(fontSize: 14),
                 ),
               ),
-              Text("$numVal"),
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () => _setValue(
-                  h,
-                  NumberValue((numVal + 5).clamp(h.min ?? -999999, h.max ?? 999999)),
-                ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(),
+              onPressed: () => _setValue(
+                h,
+                NumberValue((numVal + 5).clamp(
+                  h.min ?? -999999,
+                  h.max ?? 999999,
+                )),
               ),
-            ],
-          ),
+            ),
+          ],
         );
+
 
       case RatingKind.scale:
         final min = h.min ?? 1;

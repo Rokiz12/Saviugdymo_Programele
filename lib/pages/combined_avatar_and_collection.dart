@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pvp/pages/avatar.dart';
 import 'package:pvp/pages/minigames.dart';
+import '../widgets/custom_app_bar.dart';
 
 class CombinedAvatarAndCollectionPage extends StatelessWidget {
   final String userId;
@@ -15,14 +16,7 @@ class CombinedAvatarAndCollectionPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
 
-      appBar: AppBar(
-        title: const Text(
-          "Avataras",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.yellow,
-      ),
+      appBar:CustomAppBar(title: "Avataras"),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 100),

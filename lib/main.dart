@@ -14,6 +14,7 @@ import 'services/reward_service.dart';
 import 'services/image_preloader.dart';
 import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
+import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+
+      routes:{
+        '/settings':(context) => SettingsPage(),
+      },
+
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
@@ -61,7 +67,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
   bool _rewardDialogShowing = false;
-  int selectedIndex = 2;
+  int selectedIndex = 0;
   late TabController tabController;
   late List<Widget> pages;
 
@@ -72,13 +78,12 @@ class _MainScreenState extends State<MainScreen>
     pages = [
       CombinedAvatarAndCollectionPage(userId: widget.userId),
       StatisticsPage(userId: widget.userId),
-      HabitsPage(),
+      HabitsPage(userId: widget.userId),
       DiaryPage(),
-      SettingsPage(),
     ];
 
     tabController = TabController(
-        length: 5, vsync: this, initialIndex: selectedIndex);
+        length: 4, vsync: this, initialIndex: selectedIndex);
     tabController.addListener(() {
       if (tabController.index != selectedIndex) {
         setState(() => selectedIndex = tabController.index);
@@ -86,6 +91,7 @@ class _MainScreenState extends State<MainScreen>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      FCMService.init(widget.userId);
       context.read<RewardNotifier>().addListener(_onRewardChanged);
       _checkDailyReward();
     });
@@ -141,7 +147,6 @@ class _MainScreenState extends State<MainScreen>
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Statistikos"),
           BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Nustatymai"),
         ],
       ),
     );

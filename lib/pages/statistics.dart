@@ -21,17 +21,6 @@ class StatisticsPage extends StatefulWidget {
 class _StatisticsPageState extends State<StatisticsPage> {
 
 
-  Map<DateTime, List<double>> fakeChartData(int year) {
-    return {
-
-      DateTime(year, 1): [0.0, 0.0, 0.0, 0.0], // Jan: strong → weak
-      DateTime(year, 2): [0.2, 0.4, 0.6, 0.8], // Feb: improving
-      DateTime(year, 3): [1, 1, 1, 1], // Mar: flat
-      DateTime(year, 4): [1, 1, 1, 1], // Apr: slow decline
-    };
-  }
-
-
   DateTime _currentMonth = DateTime.now();
 
 
@@ -202,7 +191,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           MonthChartStrip(
             initialMonth: _currentMonth,
-            dataByMonth: fakeChartData(_currentMonth.year),// dataByMonth: _buildMonthChartData(),
+            dataByMonth: _buildMonthChartData(),
             onMonthChanged: (m) {
               setState(() => _currentMonth = m);
               _loadMonth();

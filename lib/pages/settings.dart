@@ -128,6 +128,54 @@ class SettingsPage extends StatelessWidget {
                   Navigator.pushReplacementNamed(context, '/login');
                 },
               ),
+
+              _SettingsTile(
+                icon: Icons.delete_forever,
+                iconColor: Colors.red,
+                title: "Ištrinti paskyrą",
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text("Ištrinti paskyrą?"),
+                      content: const Text(
+                          "Tai negrįžtamai ištrins jūsų paskyrą ir visus duomenis."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text("Atšaukti"),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text(
+                            "Ištrinti",
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm != true) return;
+
+                  try {
+                    await FirebaseAuth.instance.currentUser?.delete();
+                    Navigator.pushReplacementNamed(context, '/login');
+                  } on FirebaseAuthException catch (e) {
+                    // If the user hasn't logged in recently Firebase will throw
+                    // requires-recent-login — handle it gracefully
+                    if (e.code == 'requires-recent-login') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              "Prisijunkite iš naujo prieš trinant paskyrą."),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
             ],
           ),
 

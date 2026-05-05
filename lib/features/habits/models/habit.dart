@@ -31,6 +31,7 @@ class Habit {
     int? max,
     List<String>? options,
     bool? archived,
+    bool? systemOnly,
     String? icon,
 }) {
     return Habit(
@@ -41,6 +42,7 @@ class Habit {
       max: max?? this.max,
       options: options?? this.options,
       archived: archived?? this.archived,
+      systemOnly: systemOnly?? this.systemOnly,
       icon: icon?? this.icon,
     );
   }
@@ -53,6 +55,7 @@ class Habit {
     'max': max,
     'options': options,
     'archived': archived,
+    'systemOnly': systemOnly,
     'icon': icon,
   };
 
@@ -65,6 +68,7 @@ class Habit {
     max: json['max'] as int?,
     options: (json['options'] as List?)?.cast<String>(),
     archived: (json['archived'] as bool?) ?? false,
+    systemOnly: (json['systemOnly'] as bool?) ?? false,
     icon: json['icon'] as String?,
   );
 }

@@ -7,7 +7,26 @@ import '../features/habits/models/models.dart';
 import '../widgets/month_chart_strip.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
+import '../widgets/best_month_card.dart';
 
+
+class _MonthStats {
+  final DateTime month;
+  final double completionRate;
+  final int completedDays;
+  final int totalDays;
+  final int longestStreak;
+  final int habitsLogged;
+
+  const _MonthStats({
+    required this.month,
+    required this.completionRate,
+    required this.completedDays,
+    required this.totalDays,
+    required this.longestStreak,
+    required this.habitsLogged,
+  });
+}
 
 class StatisticsPage extends StatefulWidget {
   final String userId;
@@ -22,6 +41,71 @@ class StatisticsPage extends StatefulWidget {
 }
 
 class _StatisticsPageState extends State<StatisticsPage> {
+
+  _MonthStats? _computeBestMonth() {
+    if (_habits.isEmpty) return null;
+
+    final now = DateTime.now();
+    final allMonths = List.generate(12, (i) {
+      return DateTime(now.year, now.month - (11 - i), 1);
+    });
+
+    _MonthStats? best;
+
+    for (final month in allMonths) {
+      if (month.year == now.year && month.month == now.month) continue;
+
+      final daysInMonth = DateUtils.getDaysInMonth(month.year, month.month);
+      int completedDays = 0;
+      int habitsLogged = 0;
+      int currentStreak = 0;
+      int longestStreak = 0;
+      double rateSum = 0;
+
+      for (int d = 1; d <= daysInMonth; d++) {
+        final date = DateTime(month.year, month.month, d);
+        
+        // Skip future days
+        if (date.isAfter(now)) break;
+
+        final ratio = _completionRatioForDay(date);
+        rateSum += ratio;
+
+        final key = DateTime.utc(date.year, date.month, date.day);
+        final log = _logsByDay[key];
+        if (log != null) {
+          habitsLogged += log.entries.length;
+        }
+
+        if (ratio > 0) {
+          completedDays++;
+          currentStreak++;
+          if (currentStreak > longestStreak) longestStreak = currentStreak;
+        } else {
+          currentStreak = 0;
+        }
+      }
+
+      final rate = daysInMonth > 0 ? rateSum / daysInMonth : 0.0;
+
+      if (rate == 0 && habitsLogged == 0) continue;
+
+      final stats = _MonthStats(
+        month: month,
+        completionRate: rate,
+        completedDays: completedDays,
+        totalDays: daysInMonth,
+        longestStreak: longestStreak,
+        habitsLogged: habitsLogged,
+      );
+
+      if (best == null || stats.completionRate > best.completionRate) {
+        best = stats;
+      }
+    }
+
+    return best;
+  }
 
 
   DateTime _currentMonth = DateTime.now();
@@ -50,28 +134,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
     try {
       final habits = await _repo.getHabits(userId: widget.userId);
+      final now = DateTime.now();
 
-      // Calculate the first day of current month (local time)
-      final startOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
-
-      // Calculate the first day of next month (local time)
-      final endOfMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0);
-
-      // Convert to UTC for Firebase queries
-      final start = DateTime.utc(
-        startOfMonth.year,
-        startOfMonth.month,
-        startOfMonth.day,
-      );
-
-      final end = DateTime.utc(
-        endOfMonth.year,
-        endOfMonth.month,
-        endOfMonth.day,
-        23,
-        59,
-        59,
-      );
+      // IMPORTANT: Fetch logs for the last 12 months to support the trend line and comparisons
+      final start = DateTime.utc(now.year, now.month - 11, 1);
+      final end = DateTime.utc(now.year, now.month + 1, 0, 23, 59, 59);
 
       final logs = await _repo.getLogsForRange(
         userId: widget.userId,
@@ -89,11 +156,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
         map[key] = log;
       }
 
-      // Load diary entries with proper date range
+      // Load diary entries for the current view month
+      final viewStart = DateTime.utc(_currentMonth.year, _currentMonth.month, 1);
+      final viewEnd = DateTime.utc(_currentMonth.year, _currentMonth.month + 1, 0, 23, 59, 59);
+      
       final allDiaryEntries = await _diaryRepo.getEntriesForDateRange(
         widget.userId,
-        start,
-        end,
+        viewStart,
+        viewEnd,
       );
 
       setState(() {
@@ -103,31 +173,21 @@ class _StatisticsPageState extends State<StatisticsPage> {
         _loading = false;
       });
     } catch (e) {
-      print('Error loading month: $e');
-      setState(() {
-        _loading = false;
-      });
+      print('Error loading: $e');
+      setState(() => _loading = false);
     }
   }
 
   void _prevMonth() {
     setState(() {
-      if (_currentMonth.month == 1) {
-        _currentMonth = DateTime(_currentMonth.year - 1, 12);
-      } else {
-        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
-      }
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
     });
     _loadMonth();
   }
 
   void _nextMonth() {
     setState(() {
-      if (_currentMonth.month == 12) {
-        _currentMonth = DateTime(_currentMonth.year + 1, 1);
-      } else {
-        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
-      }
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
     });
     _loadMonth();
   }
@@ -136,7 +196,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
   // MOOD CONVERSION
   // ---------------------------------------------------------------------------
 
-  /// Convert mood text to numeric value (1-5)
   int _moodToValue(String mood) {
     if (mood.contains('Puikiai')) return 5;
     if (mood.contains('Gerai')) return 4;
@@ -146,10 +205,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
     return 0;
   }
 
-  /// Get average mood for a specific day
   double _getAverageMoodForDay(DateTime day) {
     final dayEntries = _diaryEntries.where((e) {
-      // Normalize both dates to compare only year/month/day
       final entryDay = DateTime(e.createdAt.year, e.createdAt.month, e.createdAt.day);
       final targetDay = DateTime(day.year, day.month, day.day);
       return entryDay.year == targetDay.year &&
@@ -166,7 +223,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
     return sum / dayEntries.length;
   }
 
-  /// Build mood chart data for the month
   List<FlSpot> _buildMoodChartData() {
     final daysInMonth = DateUtils.getDaysInMonth(_currentMonth.year, _currentMonth.month);
     final spots = <FlSpot>[];
@@ -184,13 +240,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
   // HABIT COMPLETION CALCULATION
   // ---------------------------------------------------------------------------
 
-
-
   Map<DateTime, List<double>> _buildMonthChartData() {
     final map = <DateTime, List<double>>{};
+    final now = DateTime.now();
 
-    for (int m = 1; m <= 12; m++) {
-      final month = DateTime(_currentMonth.year, m);
+    // Sliding 12-month window to match MonthChartStrip
+    for (int i = 0; i < 12; i++) {
+      final month = DateTime(now.year, now.month - (11 - i), 1);
       final weeks = <double>[];
 
       for (int w = 0; w < 4; w++) {
@@ -203,18 +259,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
           values.add(_completionRatioForDay(date));
         }
 
-        if (values.isNotEmpty) {
-          weeks.add(values.reduce((a, b) => a + b) / values.length);
-        }
+        weeks.add(values.isEmpty ? 0.0 : values.reduce((a, b) => a + b) / values.length);
       }
-
       map[DateTime(month.year, month.month)] = weeks;
     }
 
     return map;
   }
-
-
 
   double _completionRatioForDay(DateTime day) {
     if (_habits.isEmpty) return 0;
@@ -249,11 +300,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
       );
     }
 
-    final firstDayOfMonth =
-    DateTime(_currentMonth.year, _currentMonth.month, 1);
-    final daysInMonth =
-    DateUtils.getDaysInMonth(_currentMonth.year, _currentMonth.month);
-
+    final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final daysInMonth = DateUtils.getDaysInMonth(_currentMonth.year, _currentMonth.month);
     final firstWeekday = firstDayOfMonth.weekday; // 1 = Monday
     final totalCells = daysInMonth + (firstWeekday - 1);
 
@@ -284,14 +332,55 @@ class _StatisticsPageState extends State<StatisticsPage> {
     );
   }
 
-  Widget _buildHabitsTab(DateTime firstDayOfMonth, int daysInMonth, int firstWeekday, int totalCells) {
-    return Column(
+  Widget _buildHabitsTab(DateTime firstDayOfMonth, int daysInMonth,
+      int firstWeekday, int totalCells) {
+    final best = _computeBestMonth();
+
+    // Stats across the historical window (excluding current month)
+    final now = DateTime.now();
+    final allMonths = List.generate(12, (i) {
+      return DateTime(now.year, now.month - (11 - i), 1);
+    });
+
+    double historicalTotalRate = 0;
+    int monthsWithData = 0;
+    List<double> historicalRates = [];
+
+    for (final m in allMonths) {
+      // EXCLUDE CURRENT MONTH from the baseline and comparison chip
+      if (m.year == now.year && m.month == now.month) continue;
+
+      final monthDays = DateUtils.getDaysInMonth(m.year, m.month);
+      double monthRateSum = 0;
+      bool hasAnyData = false;
+      for (int d = 1; d <= monthDays; d++) {
+        final ratio = _completionRatioForDay(DateTime(m.year, m.month, d));
+        monthRateSum += ratio;
+        if (ratio > 0) hasAnyData = true;
+      }
+      
+      final rate = monthDays > 0 ? monthRateSum / monthDays : 0.0;
+      // We only count months that have some recorded activity in the average
+      if (hasAnyData || rate > 0) {
+        historicalTotalRate += rate;
+        monthsWithData++;
+        historicalRates.add(rate);
+      }
+    }
+    
+    final avgRate = monthsWithData > 0 ? historicalTotalRate / monthsWithData : 0.0;
+
+    int betterThanCount = 0;
+    if (best != null) {
+      for (final r in historicalRates) {
+        if (best.completionRate > r) betterThanCount++;
+      }
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 32),
+      child: Column(
         children: [
-
-          // --------------
-          // top months
-          // --------------
-
           MonthChartStrip(
             initialMonth: _currentMonth,
             dataByMonth: _buildMonthChartData(),
@@ -303,122 +392,87 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           const SizedBox(height: 8),
 
-          // -----------------------------------------------------------------
-          // MONTH SELECTOR
-          // -----------------------------------------------------------------
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: _prevMonth,
-                ),
-                Text(
-                  DateFormat.yMMMM().format(_currentMonth),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: _nextMonth,
-                ),
+                IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
+                Text(DateFormat.yMMMM().format(_currentMonth),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
               ],
             ),
           ),
 
-          // -----------------------------------------------------------------
-          // WEEKDAY HEADERS
-          // -----------------------------------------------------------------
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: const [
-                _Weekday("Pr"),
-                _Weekday("An"),
-                _Weekday("Tr"),
-                _Weekday("Kt"),
-                _Weekday("Pn"),
-                _Weekday("Št"),
-                _Weekday("Sk"),
+                _Weekday("Pr"), _Weekday("An"), _Weekday("Tr"),
+                _Weekday("Kt"), _Weekday("Pn"), _Weekday("Št"), _Weekday("Sk"),
               ],
             ),
           ),
 
           const SizedBox(height: 8),
 
-          // -----------------------------------------------------------------
-          // CALENDAR GRID
-          // -----------------------------------------------------------------
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: GridView.builder(
-                itemCount: totalCells,
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  crossAxisSpacing: 6,
-                  mainAxisSpacing: 6,
-                ),
-                itemBuilder: (context, index) {
-                  if (index < firstWeekday - 1) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final day = index - (firstWeekday - 2);
-                  final date = DateTime(
-                    _currentMonth.year,
-                    _currentMonth.month,
-                    day,
-                  );
-
-                  final isToday =
-                  DateUtils.isSameDay(DateTime.now(), date);
-
-                  final ratio = _completionRatioForDay(date);
-
-                  final bgColor = ratio == 0
-                      ? Colors.grey.shade200
-                      : Color.lerp(
-                    Colors.green.shade100,
-                    Colors.green.shade700,
-                    ratio.clamp(0, 1),
-                  )!;
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: isToday
-                          ? Border.all(color: Colors.black, width: 2)
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        "$day",
-                        style: TextStyle(
-                          fontWeight: isToday
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  );
-                },
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: totalCells,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                crossAxisSpacing: 6,
+                mainAxisSpacing: 6,
               ),
+              itemBuilder: (context, index) {
+                if (index < firstWeekday - 1) return const SizedBox.shrink();
+                final day = index - (firstWeekday - 2);
+                final date = DateTime(_currentMonth.year, _currentMonth.month, day);
+                final isToday = DateUtils.isSameDay(DateTime.now(), date);
+                final ratio = _completionRatioForDay(date);
+                final bgColor = ratio == 0 ? Colors.grey.shade200
+                    : Color.lerp(Colors.green.shade100, Colors.green.shade700, ratio.clamp(0, 1))!;
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isToday ? Border.all(color: Colors.black, width: 2) : null,
+                  ),
+                  child: Center(
+                    child: Text("$day", style: TextStyle(fontWeight: isToday ? FontWeight.bold : FontWeight.normal))),
+                );
+              },
             ),
           ),
+
+          const SizedBox(height: 32),
+
+          if (best != null)
+            BestMonthCard(
+              monthName: DateFormat.yMMMM().format(best.month),
+              completionRate: best.completionRate,
+              completedDays: best.completedDays,
+              totalDays: best.totalDays,
+              longestStreak: best.longestStreak,
+              habitsLogged: best.habitsLogged,
+              avgRate: avgRate,
+              betterThanMonths: betterThanCount,
+              totalMonths: monthsWithData,
+            ),
+
+          const SizedBox(height: 24),
         ],
-      );
+      ),
+    );
   }
 
   Widget _buildMoodTab() {
     final spots = _buildMoodChartData();
-
     if (spots.isEmpty || spots.every((spot) => spot.y == 0)) {
       return Center(
         child: Column(
@@ -426,16 +480,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
           children: [
             const Icon(Icons.mood_bad, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text(
-              "Nėra nuotaikos duomenų",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
+            const Text("Nėra nuotaikos duomenų", style: TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _loadMonth,
-              icon: const Icon(Icons.refresh),
-              label: const Text("Atnaujinti"),
-            ),
+            ElevatedButton.icon(onPressed: _loadMonth, icon: const Icon(Icons.refresh), label: const Text("Atnaujinti")),
           ],
         ),
       );
@@ -450,21 +497,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: _prevMonth,
-                ),
-                Text(
-                  DateFormat.yMMMM().format(_currentMonth),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: _nextMonth,
-                ),
+                IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
+                Text(DateFormat.yMMMM().format(_currentMonth),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
               ],
             ),
           ),
@@ -472,80 +508,26 @@ class _StatisticsPageState extends State<StatisticsPage> {
           Expanded(
             child: LineChart(
               LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 1,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: Colors.grey.withValues(alpha: 0.2),
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
+                gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1,
+                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1)),
                 titlesData: FlTitlesData(
                   show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() % 5 == 0) {
-                          return Text(
-                            value.toInt().toString(),
-                            style: const TextStyle(fontSize: 10),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
+                  bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30,
+                      getTitlesWidget: (value, meta) => value.toInt() % 5 == 0 ? Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)) : const SizedBox.shrink())),
+                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 80,
                       getTitlesWidget: (value, meta) {
                         const moods = ['😭 Blogai', '😢 Prastai', '😐 Normaliai', '🙂 Gerai', '😀 Puikiai'];
                         final index = value.toInt() - 1;
-                        if (index >= 0 && index < moods.length) {
-                          return Text(
-                            moods[index],
-                            style: const TextStyle(fontSize: 10),
-                            overflow: TextOverflow.ellipsis,
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                      reservedSize: 80,
-                    ),
-                  ),
+                        return (index >= 0 && index < moods.length) ? Text(moods[index], style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis) : const SizedBox.shrink();
+                      })),
                 ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                ),
-                minY: 0,
-                maxY: 5,
+                borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.withOpacity(0.3))),
+                minY: 0, maxY: 5,
                 lineBarsData: [
                   LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: Colors.yellow[700],
-                    barWidth: 3,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, barData, index) {
-                        return FlDotCirclePainter(
-                          radius: 4,
-                          color: Colors.yellow[700]!,
-                          strokeWidth: 2,
-                          strokeColor: Colors.white,
-                        );
-                      },
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: Colors.yellow.withValues(alpha: 0.2),
-                    ),
+                    spots: spots, isCurved: true, color: Colors.yellow[700], barWidth: 3,
+                    dotData: FlDotData(show: true, getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 4, color: Colors.yellow[700]!, strokeWidth: 2, strokeColor: Colors.white)),
+                    belowBarData: BarAreaData(show: true, color: Colors.yellow.withOpacity(0.2)),
                   ),
                 ],
               ),
@@ -557,29 +539,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 }
 
-
-
-// ---------------------------------------------------------------------------
-// WEEKDAY LABEL
-// ---------------------------------------------------------------------------
-
-
 class _Weekday extends StatelessWidget {
   final String label;
   const _Weekday(this.label);
-
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-          ),
-        ),
-      ),
-    );
+    return Expanded(child: Center(child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))));
   }
 }

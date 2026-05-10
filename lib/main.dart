@@ -66,6 +66,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
+  late RewardNotifier _rewardNotifier;
   bool _rewardDialogShowing = false;
   int selectedIndex = 0;
   late TabController tabController;
@@ -92,7 +93,8 @@ class _MainScreenState extends State<MainScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FCMService.init(widget.userId);
-      context.read<RewardNotifier>().addListener(_onRewardChanged);
+      _rewardNotifier = context.read<RewardNotifier>();
+      _rewardNotifier.addListener(_onRewardChanged);
       _checkDailyReward();
     });
   }
@@ -127,7 +129,7 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   void dispose() {
-    context.read<RewardNotifier>().removeListener(_onRewardChanged);
+    _rewardNotifier.removeListener(_onRewardChanged);
     tabController.dispose();
     super.dispose();
   }

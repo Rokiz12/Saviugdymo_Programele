@@ -131,10 +131,10 @@ class _AvatarPageState extends State<AvatarPage>
         }
 
         final petProgress = user.ownedPets[user.equippedPetId];
-        final petXp = petProgress?.xp ?? 0;
-        final petLevel = petProgress?.level ?? 1;
-        final nextLevelXp = petLevel * 100;
-        final progress = nextLevelXp == 0 ? 0.0 : petXp / nextLevelXp;
+        final userXp = user.xp;
+        final userLevel = user.level;
+        final nextLevelXp = 100;
+        final progress = nextLevelXp == 0 ? 0.0 : userXp / nextLevelXp;
 
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
@@ -355,12 +355,12 @@ class _AvatarPageState extends State<AvatarPage>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children:[
-                            Text("Level $petLevel",
+                            Text("Level $userLevel",
                                 style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xFF2D3142))),
-                            Text("$petXp / $nextLevelXp XP",
+                            Text("$userXp / $nextLevelXp XP",
                                 style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
@@ -425,7 +425,7 @@ class _AvatarPageState extends State<AvatarPage>
                       Expanded(
                         child: _StatCard(
                           title: "Total XP",
-                          value: petXp.toString(),
+                          value: userXp.toString(),
                           icon: Icons.star_rounded,
                           iconColor: Colors.blue,
                           bgColor: Colors.blue.shade50,

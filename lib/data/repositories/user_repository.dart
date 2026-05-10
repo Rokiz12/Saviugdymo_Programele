@@ -37,7 +37,7 @@ class UserRepository {
     });
   }
 
-  /// increase userxp
+  /// increase userxp and equipped pet's
   Future<({int oldLevel, int newLevel})> addUserXp(String userId, int xpToAdd) async {
     int oldLevel = 0;
     int newLevel = 0;
@@ -48,12 +48,30 @@ class UserRepository {
 
       oldLevel = data['level'] as int;
       final newXp = (data['xp'] as int) + xpToAdd;
-      newLevel = (newXp / 100).floor() + 1;
+      newLevel = oldLevel + (newXp / 100).floor();
 
-      tx.update(_users.doc(userId), {
-        'xp': newXp,
+      final Map<String, dynamic> updates = {
+        'xp': newLevel > oldLevel ? newXp - 100 : newXp,
         'level': newLevel,
-      });
+      };
+
+      // Award XP to equipped pet inside the same transaction
+      final equippedPetId = data['equippedPetId'] as String? ?? '';
+      if (equippedPetId.isNotEmpty) {
+        final ownedPets = Map<String, dynamic>.from(data['ownedPets'] as Map? ?? {});
+        final petData = ownedPets[equippedPetId] != null
+            ? Map<String, dynamic>.from(ownedPets[equippedPetId] as Map)
+            : <String, dynamic>{'xp': 0, 'level': 1};
+
+        final newPetXp = (petData['xp'] as int) + xpToAdd;
+        final oldPetLevel = petData['level'] as int;
+        final newPetLevel = oldPetLevel + (newPetXp / 100).floor();
+
+        updates['ownedPets.$equippedPetId.xp'] = newPetLevel > oldPetLevel ? newPetXp - 100 : newPetXp;
+        updates['ownedPets.$equippedPetId.level'] = newPetLevel;
+      }
+
+      tx.update(_users.doc(userId), updates);
     });
 
     return (oldLevel: oldLevel, newLevel: newLevel);
@@ -81,17 +99,18 @@ class UserRepository {
     await _users.doc(userId).update({'petMood': mood});
   }
 
-  Future<bool> tryGiveDiaryXp(String userId, int xpToAdd) async {
-    final userRef = _users.doc(userId);
+  Future<({bool granted, int oldLevel, int newLevel})> tryGiveDiaryXp(String userId, int xpToAdd) async {
+    int oldLevel = 0;
+    int newLevel = 0;
+    bool granted = false;
 
-    return await _firestore.runTransaction((tx) async {
-      final snap = await tx.get(userRef);
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(_users.doc(userId));
       final data = snap.data() as Map<String, dynamic>;
 
       final now = DateTime.now();
 
       DateTime lastDiaryXp;
-
       if (data['lastDiaryXp'] != null) {
         lastDiaryXp = (data['lastDiaryXp'] as Timestamp).toDate();
       } else {
@@ -99,26 +118,43 @@ class UserRepository {
       }
 
       bool isSameDay(DateTime a, DateTime b) {
-        return a.year == b.year &&
-            a.month == b.month &&
-            a.day == b.day;
+        return a.year == b.year && a.month == b.month && a.day == b.day;
       }
 
       if (isSameDay(lastDiaryXp, now)) {
-        return false;
+        return;
       }
 
+      oldLevel = data['level'] as int;
       final newXp = (data['xp'] as int) + xpToAdd;
-      final newLevel = (newXp / 100).floor() + 1;
+      newLevel = oldLevel + (newXp / 100).floor();
+      granted = true;
 
-      tx.update(userRef, {
-        'xp': newXp,
+      final Map<String, dynamic> updates = {
+        'xp': newLevel > oldLevel ? newXp - 100 : newXp,
         'level': newLevel,
         'lastDiaryXp': now,
-      });
+      };
 
-      return true;
+      final equippedPetId = data['equippedPetId'] as String? ?? '';
+      if (equippedPetId.isNotEmpty) {
+        final ownedPets = Map<String, dynamic>.from(data['ownedPets'] as Map? ?? {});
+        final petData = ownedPets[equippedPetId] != null
+            ? Map<String, dynamic>.from(ownedPets[equippedPetId] as Map)
+            : <String, dynamic>{'xp': 0, 'level': 1};
+
+        final newPetXp = (petData['xp'] as int) + xpToAdd;
+        final oldPetLevel = petData['level'] as int;
+        final newPetLevel = oldPetLevel + (newPetXp / 100).floor();
+
+        updates['ownedPets.$equippedPetId.xp'] = newPetLevel > oldPetLevel ? newPetXp - 100 : newPetXp;
+        updates['ownedPets.$equippedPetId.level'] = newPetLevel;
+      }
+
+      tx.update(_users.doc(userId), updates);
     });
+
+    return (granted: granted, oldLevel: oldLevel, newLevel: newLevel);
   }
 
 }

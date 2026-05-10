@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:before_after/before_after.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:provider/provider.dart';
 import 'package:pvp/services/sound_service.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
@@ -11,6 +12,8 @@ import '../widgets/custom_app_bar.dart';
 import '../data/repositories/user_repository.dart';
 import '../data/repositories/diary_question_repository.dart';
 import '../data/models/diary_question_model.dart';
+import '../services/reward_service.dart';
+import '../services/reward_notifier.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -214,11 +217,18 @@ class _DiaryPageState extends State<DiaryPage> {
 
       _loadQuestions(); 
       final userRepo = UserRepository();
-      final gotXp = await userRepo.tryGiveDiaryXp(_userId, 10);
+      final (
+      granted: gotXp,
+      oldLevel: oldLevel,
+      newLevel: newLevel,
+      ) = await userRepo.tryGiveDiaryXp(_userId, 20);
 
+      if (gotXp) {
+        RewardService().checkLevelUp(userId: _userId, oldLevel: oldLevel, newLevel: newLevel, notifier: context.read<RewardNotifier>());
+      }
       if (gotXp && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Gavai +10 XP!", style: TextStyle(fontWeight: FontWeight.bold))),
+          const SnackBar(content: Text("Gavai +20 XP!", style: TextStyle(fontWeight: FontWeight.bold))),
         );
       }
 

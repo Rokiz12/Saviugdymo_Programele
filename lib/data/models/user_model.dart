@@ -16,6 +16,7 @@ class UserModel {
   final Map<String, UserPetProgress> ownedPets;
   final String petMood;
   final int streak;
+  final bool premium;
 
   UserModel({
     required this.id,
@@ -32,6 +33,7 @@ class UserModel {
     this.ownedPets = const {},
     this.petMood = 'happy',
     this.streak = 0,
+    this.premium = false,
   }) : lastDailyReward = lastDailyReward ?? DateTime(2000, 1, 1),
        lastDiaryXp = lastDiaryXp ?? DateTime(2000, 1, 1);
 
@@ -62,6 +64,7 @@ class UserModel {
       ),
       petMood: map['petMood'] ?? 'happy',
       streak: map['streak'] ?? 0,
+      premium: map['premium'] ?? false,
     );
   }
 
@@ -80,6 +83,7 @@ class UserModel {
       'ownedPets': ownedPets.map((petId, progress) => MapEntry(petId, progress.toMap())),
       'petMood': petMood,
       'streak': streak,
+      'premium': premium,
     };
   }
 }

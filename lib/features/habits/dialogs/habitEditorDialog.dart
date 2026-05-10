@@ -8,6 +8,7 @@ class HabitEditorDialog extends StatefulWidget {
   @override
   State<HabitEditorDialog> createState() => _HabitEditorDialogState();
 }
+
 class IconPickerField extends StatefulWidget {
   final String? initial;
   final ValueChanged<String?> onChanged;
@@ -82,32 +83,29 @@ class _IconPickerFieldState extends State<IconPickerField> {
   }
 }
 
-
 class _HabitEditorDialogState extends State<HabitEditorDialog> {
-  final _nameCtrl = TextEditingController();
-  final _minCtrl = TextEditingController();
-  final _maxCtrl = TextEditingController();
-  final _optionsCtrl = TextEditingController();
+  final _nameCtrl     = TextEditingController();
+  final _minCtrl      = TextEditingController();
+  final _maxCtrl      = TextEditingController();
+  final _optionsCtrl  = TextEditingController();
+  final _stepGoalCtrl = TextEditingController(); // ← new
 
   RatingKind _kind = RatingKind.checkbox;
   String? _selectedIcon;
-
 
   @override
   void initState() {
     super.initState();
     final h = widget.initial;
-
     if (h != null) {
       _nameCtrl.text = h.name;
       _kind = h.kind;
       _selectedIcon = h.icon;
-
-
-      if (h.min != null) _minCtrl.text = "${h.min}";
-      if (h.max != null) _maxCtrl.text = "${h.max}";
+      if (h.min != null) _minCtrl.text = '${h.min}';
+      if (h.max != null) _maxCtrl.text = '${h.max}';
+      if (h.stepGoal != null) _stepGoalCtrl.text = '${h.stepGoal}';
       if (h.options != null && h.options!.isNotEmpty) {
-        _optionsCtrl.text = h.options!.join(", ");
+        _optionsCtrl.text = h.options!.join(', ');
       }
     }
   }
@@ -118,6 +116,7 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
     _minCtrl.dispose();
     _maxCtrl.dispose();
     _optionsCtrl.dispose();
+    _stepGoalCtrl.dispose();
     super.dispose();
   }
 
@@ -150,10 +149,11 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
                   value: k,
                   child: Text(
                     switch (k) {
-                      RatingKind.checkbox => "Pažyma (✔/✖)",
-                      RatingKind.number => "Skaičius",
-                      RatingKind.scale => "Skalė",
+                      RatingKind.checkbox   => "Pažyma (✔/✖)",
+                      RatingKind.number     => "Skaičius",
+                      RatingKind.scale      => "Skalė",
                       RatingKind.enumerator => "Kategorija",
+                      RatingKind.steps      => "Žingsniai 👟",  // ← new
                     },
                   ),
                 );
@@ -161,6 +161,7 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
               onChanged: (k) => setState(() => _kind = k ?? RatingKind.checkbox),
             ),
 
+            // Number / Scale fields
             if (_kind == RatingKind.number || _kind == RatingKind.scale) ...[
               const SizedBox(height: 12),
               TextField(
@@ -176,6 +177,7 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
               ),
             ],
 
+            // Enumerator fields
             if (_kind == RatingKind.enumerator) ...[
               const SizedBox(height: 12),
               TextField(
@@ -183,6 +185,25 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
                 decoration: const InputDecoration(
                   labelText: "Parinktys (atskirti kableliais)",
                 ),
+              ),
+            ],
+
+            // Steps field  ← new
+            if (_kind == RatingKind.steps) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _stepGoalCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Tikslas (žingsniai)",
+                  hintText: "pvz. 10000",
+                  prefixIcon: Icon(Icons.directions_walk),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Pažymės kaip atliktą automatiškai, kai pasieksite tikslą.",
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ],
@@ -194,51 +215,55 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text("Atšaukti"),
         ),
-
         TextButton(
-          onPressed: () {
-            final name = _nameCtrl.text.trim();
-            if (name.isEmpty) return;
-
-            int? min = int.tryParse(_minCtrl.text);
-            int? max = int.tryParse(_maxCtrl.text);
-
-            if (!(_kind == RatingKind.number || _kind == RatingKind.scale)) {
-              min = null;
-              max = null;
-            }
-
-
-            List<String>? opts;
-            if (_kind == RatingKind.enumerator) {
-              final raw = _optionsCtrl.text
-                  .split(',')
-                  .map((s) => s.trim())
-                  .where((s) => s.isNotEmpty && s != '---')
-                  .toList();
-
-              opts = ['---', ...raw];
-            }
-
-
-            final id = widget.initial?.id ??
-                "${name.toLowerCase().replaceAll(' ', '-')}-${DateTime.now().millisecondsSinceEpoch}";
-
-            final habit = Habit(
-              id: id,
-              name: name,
-              kind: _kind,
-              min: min,
-              max: max,
-              options: opts,
-              icon: _selectedIcon,
-            );
-
-            Navigator.pop(context, habit);
-          },
+          onPressed: _submit,
           child: Text(editing ? "Išsaugoti" : "Pridėti"),
-        )
+        ),
       ],
     );
+  }
+
+  void _submit() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+
+    int? min = int.tryParse(_minCtrl.text);
+    int? max = int.tryParse(_maxCtrl.text);
+    int? stepGoal = int.tryParse(_stepGoalCtrl.text);
+
+    // Clear irrelevant fields per kind
+    if (!(_kind == RatingKind.number || _kind == RatingKind.scale)) {
+      min = null;
+      max = null;
+    }
+    if (_kind != RatingKind.steps) {
+      stepGoal = null;
+    }
+
+    List<String>? opts;
+    if (_kind == RatingKind.enumerator) {
+      final raw = _optionsCtrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty && s != '---')
+          .toList();
+      opts = ['---', ...raw];
+    }
+
+    final id = widget.initial?.id ??
+        "${name.toLowerCase().replaceAll(' ', '-')}-${DateTime.now().millisecondsSinceEpoch}";
+
+    final habit = Habit(
+      id: id,
+      name: name,
+      kind: _kind,
+      min: min,
+      max: max,
+      options: opts,
+      icon: _selectedIcon,
+      stepGoal: stepGoal,   // ← new
+    );
+
+    Navigator.pop(context, habit);
   }
 }

@@ -1,1 +1,1 @@
-enum RatingKind { checkbox, number, scale, enumerator}
+enum RatingKind { checkbox, number, scale, enumerator, steps }

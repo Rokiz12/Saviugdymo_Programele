@@ -29,5 +29,8 @@ int goalValueOf(RatingValue? value, Habit habit) {
         return value.option != options.first ? 1 : 0;
       }
       return 0;
+
+    case RatingKind.steps:
+      return value is NumberValue ? value.value.round() : 0;
   }
 }

@@ -5,6 +5,7 @@ import 'package:pvp/features/habits/models/models.dart';
 import 'package:pvp/features/habits/utils/goalProgress.dart';
 import 'package:pvp/features/habits/dialogs/habitEditorDialog.dart';
 import 'package:pvp/features/habits/dialogs/goalEditDialog.dart';
+import 'package:pvp/services/step_service.dart';
 import '../services/sound_service.dart';
 import '../features/habits/utils/habitIcons.dart';
 import '../widgets/custom_app_bar.dart';
@@ -25,9 +26,12 @@ class _HabitsPageState extends State<HabitsPage> {
   List<DayLog> _monthLogs = [];
   DayLog? _today;
 
+  // Stores today's live step count for display in the row
+  int _todaySteps = 0;
+
   ForegroundTimeTracker? _tracker;
 
-  // INIT
+  // ─── INIT ───────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -39,17 +43,18 @@ class _HabitsPageState extends State<HabitsPage> {
     await _loadInitial();
     await _ensureAutoHabitExists();
     _startTracker();
+    await _syncStepHabits(); // ← on-launch step check
   }
 
-  // DATA LOAD
+  // ─── DATA LOAD ──────────────────────────────────────────────────────────────
 
   Future<void> _loadInitial() async {
     final habits = await _repo.getHabits(userId: widget.userId);
-    final goals = await _repo.getGoals(userId: widget.userId);
+    final goals  = await _repo.getGoals(userId: widget.userId);
 
-    final now = DateTime.now().toUtc();
+    final now   = DateTime.now().toUtc();
     final start = DateTime.utc(now.year, now.month, 1);
-    final end = DateTime.utc(now.year, now.month + 1, 0);
+    final end   = DateTime.utc(now.year, now.month + 1, 0);
 
     final monthLogs = await _repo.getLogsForRange(
       userId: widget.userId,
@@ -59,26 +64,81 @@ class _HabitsPageState extends State<HabitsPage> {
 
     DayLog today = monthLogs.firstWhere(
           (log) =>
-      log.dateUtc.year == now.year &&
+      log.dateUtc.year  == now.year &&
           log.dateUtc.month == now.month &&
-          log.dateUtc.day == now.day,
+          log.dateUtc.day   == now.day,
       orElse: () =>
           DayLog(dateUtc: DateTime.utc(now.year, now.month, now.day), entries: {}),
     );
 
     setState(() {
-      _habits = habits;
-      _goals = goals;
-      _today = today;
+      _habits    = habits;
+      _goals     = goals;
+      _today     = today;
       _monthLogs = monthLogs;
     });
   }
 
-  // GOAL PROGRESS CALCULATION
+  // ─── STEP SYNC ──────────────────────────────────────────────────────────────
+
+  /// Called on every app launch. Reads today's steps from Health Connect,
+  /// updates _todaySteps for the UI, saves the count to the DayLog,
+  /// and marks any step habit as complete if its goal is reached.
+  Future<void> _syncStepHabits() async {
+    final stepHabits = _habits.where((h) => h.kind == RatingKind.steps).toList();
+    if (stepHabits.isEmpty) return;
+
+    final steps = await StepService.getTodaySteps();
+    if (steps == null) return; // permission denied or read failed — silent, try again next launch
+
+    // Keep for live display in the row
+    if (mounted) setState(() => _todaySteps = steps);
+
+    // Save step count and mark complete when goal is reached
+    for (final h in stepHabits) {
+      final goal   = h.stepGoal ?? 0;
+      final isDone = steps >= goal && goal > 0;
+
+      // Always write the step count so the progress bar stays current
+      _saveStepValue(h, steps, markDone: isDone);
+    }
+  }
+
+  /// Persists the step count into the DayLog and optionally marks it done.
+  void _saveStepValue(Habit h, int steps, {required bool markDone}) {
+    final now    = DateTime.now().toUtc();
+    final logDay = DateTime.utc(now.year, now.month, now.day);
+
+    DayLog log = _today ?? DayLog(dateUtc: logDay, entries: {});
+    log = log.setValue(h.id, NumberValue(steps));
+
+    // ── keep _monthLogs in sync so goal progress reads the same value ──
+    final idx = _monthLogs.indexWhere(
+          (l) => l.dateUtc.year  == logDay.year &&
+          l.dateUtc.month == logDay.month &&
+          l.dateUtc.day   == logDay.day,
+    );
+    if (idx >= 0) {
+      _monthLogs[idx] = log;
+    } else {
+      _monthLogs.add(log);
+    }
+
+    setState(() {
+      _today     = log;
+      _monthLogs = List.from(_monthLogs); // trigger rebuild
+    });
+
+    _repo.upsertDayLog(userId: widget.userId, log: log);
+
+    if (markDone) SoundService.playMarkHabit();
+  }
+
+  // ─── GOAL PROGRESS ──────────────────────────────────────────────────────────
 
   int _calculateGoalProgress(Goal g) {
     final habitId = g.habbitID;
-    final habit = _habits.firstWhere(
+    final habit   = _habits.firstWhere(
           (h) => h.id == habitId,
       orElse: () => Habit(id: "missing", name: "Missing", kind: RatingKind.checkbox),
     );
@@ -104,10 +164,8 @@ class _HabitsPageState extends State<HabitsPage> {
             .fold(0, (a, b) => a + b);
 
       case GoalPeriod.custom:
-        final days = g.customDays ?? 1;
-        final now = DateTime.now().toUtc();
-        final start = now.subtract(Duration(days: days));
-
+        final days  = g.customDays ?? 1;
+        final start = DateTime.now().toUtc().subtract(Duration(days: days));
         return _monthLogs
             .where((log) => log.dateUtc.isAfter(start))
             .map((log) => goalValueOf(log.entries[habitId], habit))
@@ -116,15 +174,14 @@ class _HabitsPageState extends State<HabitsPage> {
   }
 
   bool _isInCurrentWeek(DateTime d) {
-    final now = DateTime.now();
+    final now    = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final sunday = monday.add(const Duration(days: 6));
-
     return d.isAfter(monday.subtract(const Duration(days: 1))) &&
         d.isBefore(sunday.add(const Duration(days: 1)));
   }
 
-  // HABITS CRUD
+  // ─── HABITS CRUD ────────────────────────────────────────────────────────────
 
   Future<void> _addHabit() async {
     final habit = await showDialog<Habit>(
@@ -134,11 +191,13 @@ class _HabitsPageState extends State<HabitsPage> {
     if (habit == null) return;
 
     await _repo.addHabit(userId: widget.userId, habit: habit);
-
     setState(() => _habits.add(habit));
 
     final initVal = _initialValueFor(habit);
     if (initVal != null) _setValue(habit, initVal);
+
+    // If a step habit was just created, sync immediately
+    if (habit.kind == RatingKind.steps) await _syncStepHabits();
   }
 
   Future<void> _editHabit(Habit h) async {
@@ -171,15 +230,13 @@ class _HabitsPageState extends State<HabitsPage> {
         content: Text("Ar tikrai norite ištrinti '${h.name}'?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Ne")),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Taip")),
+          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text("Taip")),
         ],
       ),
     );
-
     if (confirm != true) return;
 
     await _repo.deleteHabit(userId: widget.userId, habitId: h.id);
-
     SoundService.playDeleteHabit();
 
     setState(() {
@@ -188,36 +245,27 @@ class _HabitsPageState extends State<HabitsPage> {
     });
   }
 
-  // GOALS CRUD
+  // ─── GOALS CRUD ─────────────────────────────────────────────────────────────
 
   Future<void> _addGoal() async {
     final goal = await showDialog<Goal>(
       context: context,
-      builder: (_) => GoalEditorDialog(
-        habits: _habits,
-      ),
+      builder: (_) => GoalEditorDialog(habits: _habits),
     );
-
     if (goal == null) return;
 
     await _repo.addGoal(userId: widget.userId, goal: goal);
-
     setState(() => _goals.add(goal));
   }
 
   Future<void> _editGoal(Goal g) async {
     final updated = await showDialog<Goal>(
       context: context,
-      builder: (_) => GoalEditorDialog(
-        habits: _habits,
-        initial: g,
-      ),
+      builder: (_) => GoalEditorDialog(habits: _habits, initial: g),
     );
-
     if (updated == null) return;
 
     await _repo.updateGoal(userId: widget.userId, goal: updated);
-
     setState(() {
       final i = _goals.indexWhere((x) => x.id == updated.id);
       if (i >= 0) _goals[i] = updated;
@@ -232,19 +280,17 @@ class _HabitsPageState extends State<HabitsPage> {
         content: Text("Ar tikrai norite ištrinti '${g.name}'?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Ne")),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Taip")),
+          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text("Taip")),
         ],
       ),
     );
-
     if (confirm != true) return;
 
     await _repo.deleteGoal(userId: widget.userId, goalId: g.id);
-
     setState(() => _goals.removeWhere((x) => x.id == g.id));
   }
 
-  // HABIT VALUE HANDLING
+  // ─── HABIT VALUE HANDLING ───────────────────────────────────────────────────
 
   RatingValue? _initialValueFor(Habit h) {
     switch (h.kind) {
@@ -258,6 +304,8 @@ class _HabitsPageState extends State<HabitsPage> {
         return h.options != null && h.options!.isNotEmpty
             ? EnumValue(h.options!.first)
             : null;
+      case RatingKind.steps:
+        return const NumberValue(0); // step count starts at 0
     }
   }
 
@@ -277,36 +325,31 @@ class _HabitsPageState extends State<HabitsPage> {
       case RatingKind.scale:
         final min = h.min ?? 1;
         final max = h.max ?? 5;
-        if (v is NumberValue) {
-          return NumberValue(v.value.clamp(min, max));
-        }
+        if (v is NumberValue) return NumberValue(v.value.clamp(min, max));
         return NumberValue(min);
 
       case RatingKind.enumerator:
         final opts = h.options ?? const [];
         if (v is EnumValue && opts.contains(v.option)) return v;
         return opts.isNotEmpty ? EnumValue(opts.first) : null;
+
+      case RatingKind.steps:
+        return v is NumberValue ? v : const NumberValue(0);
     }
   }
 
   void _setValue(Habit h, RatingValue v) {
-      SoundService.playMarkHabit();
-
-
+    SoundService.playMarkHabit();
 
     final newLog = (_today ??
-        DayLog(
-          dateUtc: DateTime.now().toUtc(),
-          entries: {},
-        ))
+        DayLog(dateUtc: DateTime.now().toUtc(), entries: {}))
         .setValue(h.id, v);
 
     setState(() => _today = newLog);
-
     _repo.upsertDayLog(userId: widget.userId, log: newLog);
   }
 
-  // AUTO HABIT TRACKER
+  // ─── AUTO HABIT TRACKER ─────────────────────────────────────────────────────
 
   Future<void> _ensureAutoHabitExists() async {
     const auto = Habit(
@@ -326,17 +369,15 @@ class _HabitsPageState extends State<HabitsPage> {
     _tracker = ForegroundTimeTracker(
       threshold: const Duration(minutes: 2),
       onReached: (day) async {
-        DayLog log = _today ??
-            DayLog(dateUtc: day, entries: {});
+        DayLog log = _today ?? DayLog(dateUtc: day, entries: {});
 
-        if (log.dateUtc.year != day.year ||
+        if (log.dateUtc.year  != day.year ||
             log.dateUtc.month != day.month ||
-            log.dateUtc.day != day.day) {
+            log.dateUtc.day   != day.day) {
           log = DayLog(dateUtc: day, entries: {});
         }
 
         log = log.setValue('app2min', const BoolValue(true));
-
         await _repo.upsertDayLog(userId: widget.userId, log: log);
 
         final now = DateTime.now().toUtc();
@@ -353,40 +394,28 @@ class _HabitsPageState extends State<HabitsPage> {
     super.dispose();
   }
 
-  // UI
+  // ─── UI ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     if (_today == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-
       appBar: const CustomAppBar(title: "Įpročiai"),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // HABITS TABLE
             _buildHabitsSection(),
-
             const SizedBox(height: 30),
-
-            const SizedBox(height: 30),
-
-            // GOALS TABLE
             _buildGoalsSection(),
           ],
         ),
       ),
     );
   }
-
-  // UI SUBWIDGETS
 
   Widget _buildHabitsSection() {
     return Container(
@@ -406,34 +435,32 @@ class _HabitsPageState extends State<HabitsPage> {
               final h = _habits[index];
               final v = _today!.entries[h.id];
 
+              // Step habits need more vertical space for the progress bar
+              final rowHeight = h.kind == RatingKind.steps ? 64.0 : 44.0;
+
               return SizedBox(
-                height: 44,
+                height: rowHeight,
                 child: Row(
                   children: [
-                    // LEFT: habit name
                     Expanded(
                       child: GestureDetector(
                         onTap: h.systemOnly ? null : () => _editHabit(h),
                         onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(                          // 👈 replaced Align
+                          child: Row(
                             children: [
                               if (h.icon != null) ...[
                                 Icon(habitIconData(h.icon), size: 20),
                                 const SizedBox(width: 8),
                               ],
-                              Text(
-                                h.name,
-                                style: const TextStyle(fontSize: 16),
-                              ),
+                              Text(h.name,
+                                  style: const TextStyle(fontSize: 16)),
                             ],
                           ),
                         ),
                       ),
                     ),
-
-                    // RIGHT: indicator / controls
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: _buildTrailingFor(h, v),
@@ -449,13 +476,13 @@ class _HabitsPageState extends State<HabitsPage> {
           TextButton.icon(
             onPressed: _addHabit,
             icon: const Icon(Icons.add, color: Colors.black),
-            label: const Text("Pridėti įprotį", style: TextStyle(color: Colors.black)),
+            label: const Text("Pridėti įprotį",
+                style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
     );
   }
-
 
   Widget _buildGoalsSection() {
     return Container(
@@ -471,9 +498,9 @@ class _HabitsPageState extends State<HabitsPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _goals.length,
             itemBuilder: (context, index) {
-              final g = _goals[index];
+              final g        = _goals[index];
               final progress = _calculateGoalProgress(g);
-              double percent = (progress / g.target).clamp(0, 1.0);
+              final percent  = (progress / g.target).clamp(0.0, 1.0);
 
               return ListTile(
                 title: Text(g.name),
@@ -501,36 +528,29 @@ class _HabitsPageState extends State<HabitsPage> {
           TextButton.icon(
             onPressed: _addGoal,
             icon: const Icon(Icons.add, color: Colors.black),
-            label: const Text("Pridėti Tikslą", style: TextStyle(color: Colors.black)),
+            label: const Text("Pridėti Tikslą",
+                style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // HABIT TRAILING WIDGET
-  // ---------------------------------------------------------------------------
+  // ─── HABIT TRAILING WIDGET ──────────────────────────────────────────────────
 
   Widget _buildTrailingFor(Habit h, RatingValue? v) {
     switch (h.kind) {
+
       case RatingKind.checkbox:
         final checked = (v is BoolValue) ? v.value : false;
 
         if (h.systemOnly) {
-          return IgnorePointer(
-            child: Checkbox(
-              value: checked,
-              onChanged: null,
-            ),
-          );
+          return IgnorePointer(child: Checkbox(value: checked, onChanged: null));
         }
-
         return Checkbox(
           value: checked,
           onChanged: (val) => _setValue(h, BoolValue(val ?? false)),
         );
-
 
       case RatingKind.number:
         final numVal = (v is NumberValue) ? v.value : (h.min ?? 0);
@@ -547,18 +567,13 @@ class _HabitsPageState extends State<HabitsPage> {
               onPressed: () => _setValue(
                 h,
                 NumberValue((numVal - 5).clamp(
-                  h.min ?? -999999,
-                  h.max ?? 999999,
-                )),
+                    h.min ?? -999999, h.max ?? 999999)),
               ),
             ),
             SizedBox(
               width: 24,
               child: Center(
-                child: Text(
-                  "$numVal",
-                  style: const TextStyle(fontSize: 14),
-                ),
+                child: Text("$numVal", style: const TextStyle(fontSize: 14)),
               ),
             ),
             IconButton(
@@ -570,18 +585,15 @@ class _HabitsPageState extends State<HabitsPage> {
               onPressed: () => _setValue(
                 h,
                 NumberValue((numVal + 5).clamp(
-                  h.min ?? -999999,
-                  h.max ?? 999999,
-                )),
+                    h.min ?? -999999, h.max ?? 999999)),
               ),
             ),
           ],
         );
 
-
       case RatingKind.scale:
-        final min = h.min ?? 1;
-        final max = h.max ?? 5;
+        final min     = h.min ?? 1;
+        final max     = h.max ?? 5;
         final current = (v is NumberValue) ? v.value.toDouble() : min.toDouble();
 
         return SizedBox(
@@ -604,16 +616,60 @@ class _HabitsPageState extends State<HabitsPage> {
         );
 
       case RatingKind.enumerator:
-        final options = h.options ?? const ["A", "B", "C"];
+        final options  = h.options ?? const ["A", "B", "C"];
         final selected = (v is EnumValue) ? v.option : null;
 
         return DropdownButton<String>(
           value: options.contains(selected) ? selected : null,
           hint: const Text("Pasirinkti"),
-          items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+          items: options
+              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+              .toList(),
           onChanged: (val) {
             if (val != null) _setValue(h, EnumValue(val));
           },
+        );
+
+    // ── Steps trailing widget ──────────────────────────────────────────────
+      case RatingKind.steps:
+        final goal     = h.stepGoal ?? 0;
+        final steps    = _todaySteps;
+        final percent  = goal > 0 ? (steps / goal).clamp(0.0, 1.0) : 0.0;
+        final isDone   = goal > 0 && steps >= goal;
+
+        return SizedBox(
+          width: 140,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isDone)
+                    const Icon(Icons.check_circle,
+                        color: Colors.green, size: 16),
+                  if (isDone) const SizedBox(width: 4),
+                  Text(
+                    "$steps / $goal",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDone ? Colors.green : Colors.black87,
+                      fontWeight:
+                      isDone ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              LinearProgressIndicator(
+                value: percent,
+                backgroundColor: Colors.grey[300],
+                color: isDone ? Colors.green : Colors.blue,
+                minHeight: 6,
+              ),
+            ],
+          ),
         );
     }
   }

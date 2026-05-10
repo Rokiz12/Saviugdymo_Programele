@@ -10,6 +10,7 @@ class Habit {
   final bool archived;
   final bool systemOnly;
   final String? icon;
+  final int? stepGoal;
 
   const Habit({
     required this.id,
@@ -21,6 +22,7 @@ class Habit {
     this.archived = false,
     this.systemOnly = false,
     this.icon,
+    this.stepGoal,
 });
 
   Habit copyWith({
@@ -33,6 +35,7 @@ class Habit {
     bool? archived,
     bool? systemOnly,
     String? icon,
+    int? stepGoal,
 }) {
     return Habit(
       id: id?? this.id,
@@ -44,6 +47,7 @@ class Habit {
       archived: archived?? this.archived,
       systemOnly: systemOnly?? this.systemOnly,
       icon: icon?? this.icon,
+      stepGoal: stepGoal ?? this.stepGoal,
     );
   }
 
@@ -57,6 +61,7 @@ class Habit {
     'archived': archived,
     'systemOnly': systemOnly,
     'icon': icon,
+    'stepGoal': stepGoal,
   };
 
 
@@ -70,5 +75,6 @@ class Habit {
     archived: (json['archived'] as bool?) ?? false,
     systemOnly: (json['systemOnly'] as bool?) ?? false,
     icon: json['icon'] as String?,
+    stepGoal: json['stepGoal'] as int?,
   );
 }

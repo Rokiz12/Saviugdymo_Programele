@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:before_after/before_after.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // PRIDĖTAS CACHING
 import 'package:pvp/services/sound_service.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
@@ -28,8 +29,17 @@ class _DiaryPageState extends State<DiaryPage> {
   
   final String _userId = FirebaseAuth.instance.currentUser!.uid;
 
+  // Memories Tab Variables
   bool _isSelectionMode = false;
   Set<String> _selectedForDeletion = {};
+  
+  // 0 = Kategorijos, 1 = Visos nuotraukos
+  int _memoriesViewIndex = 0; 
+  String? _selectedCategoryView; // Jei null, rodomi aplankalai. Jei tekstas - rodomos tos kategorijos nuotraukos
+
+  // Categories for uploading
+  final List<String> _categories = ['test 1', 'test 2', 'test 3', 'test 4'];
+  String _selectedUploadCategory = 'test 1';
 
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
@@ -42,20 +52,21 @@ class _DiaryPageState extends State<DiaryPage> {
   List<DiaryQuestionModel> _currentQuestions =[];
   bool _questionsLoaded = false;
   
-  final textControllers =[
+  final textControllers = [
     TextEditingController(), 
     TextEditingController(), 
     TextEditingController(), 
     TextEditingController(), 
   ];
 
-  final List<String> _weekDays =['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
-  final List<String> _moods =['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
-  final List<String> _moodEmojis =['😀', '🙂', '😐', '😢', '😭'];
+  final List<String> _weekDays = ['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
+  final List<String> _moods = ['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
+  final List<String> _moodEmojis = ['😀', '🙂', '😐', '😢', '😭'];
 
   @override
   void initState() {
     super.initState();
+    _selectedUploadCategory = _categories.first;
     _loadQuestions();
   }
 
@@ -143,13 +154,11 @@ class _DiaryPageState extends State<DiaryPage> {
       return;
     }
 
-    // --- SOUND LOGIC (Merged from Teammate's code) ---
     if (_moods.indexOf(selectedMood) <= 1) {
       SoundService.playHappyDiary();
     } else {
       SoundService.playSadDiary();
     }
-    // -------------------------------------------------
 
     final navigator = Navigator.of(context);
 
@@ -194,6 +203,8 @@ class _DiaryPageState extends State<DiaryPage> {
           diaryText: textControllers[3].text,
           preview: preview.length > 50 ? '${preview.substring(0, 47)}...' : preview,
           imageUrl: uploadedImageUrl,
+          // Priskirta kategorija išsaugoma į Firebase
+          category: _selectedImage != null ? _selectedUploadCategory : null, 
         ),
       );
 
@@ -267,7 +278,7 @@ class _DiaryPageState extends State<DiaryPage> {
 
   String _formatDate(DateTime date) => '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-  String _getMonthName(int m) =>['Sausis', 'Vasaris', 'Kovas', 'Balandis', 'Gegužė', 'Birželis',
+  String _getMonthName(int m) => ['Sausis', 'Vasaris', 'Kovas', 'Balandis', 'Gegužė', 'Birželis',
         'Liepa', 'Rugpjūtis', 'Rugsėjis', 'Spalis', 'Lapkritis', 'Gruodis'][m - 1];
 
   @override
@@ -278,7 +289,7 @@ class _DiaryPageState extends State<DiaryPage> {
         appBar: CustomAppBar(
           title: 'Dienoraštis',
           bottom: const TabBar(
-            tabs:[
+            tabs: [
               Tab(icon: Icon(Icons.add), text: "Naujas"),
               Tab(icon: Icon(Icons.calendar_month), text: "Kalendorius"),
               Tab(icon: Icon(Icons.photo_library), text: "Prisiminimai"),
@@ -292,11 +303,11 @@ class _DiaryPageState extends State<DiaryPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final entries = snapshot.data ?? [];
+            final entries = snapshot.data ??[];
             _groupEntries(entries);
 
             return TabBarView(
-              children:[
+              children: [
                 _buildNewEntryTab(),
                 _buildCalendarTab(),
                 _buildMemoriesTab(entries), 
@@ -415,6 +426,27 @@ class _DiaryPageState extends State<DiaryPage> {
             ),
           ),
 
+          if (_selectedImage != null) ...[
+            const SizedBox(height: 16),
+            const Text("Pasirinkite kategoriją:", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedUploadCategory,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              items: _categories.map((cat) => DropdownMenuItem(
+                value: cat,
+                child: Text(cat),
+              )).toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedUploadCategory = val);
+              },
+            ),
+          ],
+
           const SizedBox(height: 32), 
 
           ElevatedButton(
@@ -529,6 +561,7 @@ class _DiaryPageState extends State<DiaryPage> {
           diaryText: entry.diaryText,
           preview: entry.preview,
           imageUrl: null,
+          category: entry.category,
         );
         
         await _repository.addEntry(_userId, updatedEntry);
@@ -555,42 +588,41 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
+  // --- MEMORIES & FOLDERS LOGIC ---
+
   Widget _buildMemoriesTab(List<DiaryEntryModel> allEntries) {
     final memories = allEntries.where((e) => e.imageUrl != null && e.imageUrl!.isNotEmpty).toList();
     memories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    if (memories.isEmpty) {
-      return const Center(
-        child: Text(
-          "Dar nėra jokių nuotraukų.\nPridėkite nuotraukų prie savo įrašų!",
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, fontSize: 16),
-        ),
-      );
-    }
-
-    final today = DateTime.now();
-    DiaryEntryModel? memoryFromToday;
-    DiaryEntryModel? pastMemory;
-    String singleTitle = "";
-    String comparisonTitle = "";
-
-    try { memoryFromToday = memories.firstWhere((e) => e.createdAt.year == today.year && e.createdAt.month == today.month && e.createdAt.day == today.day); } catch (_) {}
-    try {
-      pastMemory = memories.firstWhere((e) => e.createdAt.year == today.year - 1 && e.createdAt.month == today.month && e.createdAt.day == today.day);
-      singleTitle = "Lygiai prieš 1 metus..."; comparisonTitle = "1 Metų Progresas!";
-    } catch (_) {}
-
-    if (pastMemory == null) {
-      final oneMonthAgo = DateTime(today.year, today.month - 1, today.day);
-      try {
-        pastMemory = memories.firstWhere((e) => e.createdAt.year == oneMonthAgo.year && e.createdAt.month == oneMonthAgo.month && e.createdAt.day == oneMonthAgo.day);
-        singleTitle = "Prieš 1 mėnesį šią dieną..."; comparisonTitle = "1 Mėnesio Progresas!";
-      } catch (_) {}
-    }
-
     return Column(
       children:[
+        // Toggle Buttons: Kategorijos vs Visos
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text("Kategorijos"), icon: Icon(Icons.folder)),
+              ButtonSegment(value: 1, label: Text("Visos"), icon: Icon(Icons.photo_library)),
+            ],
+            selected: {_memoriesViewIndex},
+            onSelectionChanged: (newSelection) {
+              setState(() {
+                _memoriesViewIndex = newSelection.first;
+                _selectedCategoryView = null; // Reset category view when switching tabs
+                _isSelectionMode = false;
+                _selectedForDeletion.clear();
+              });
+            },
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                (states) => states.contains(WidgetState.selected) ? Colors.yellow : Colors.white,
+              ),
+              foregroundColor: WidgetStateProperty.all(Colors.black),
+            ),
+          ),
+        ),
+
+        // Ši dalis rodoma pasirinkus nuotraukų trynimą
         if (_isSelectionMode)
           Container(
             color: Colors.yellow[300],
@@ -625,77 +657,214 @@ class _DiaryPageState extends State<DiaryPage> {
             ),
           ),
 
-        if (!_isSelectionMode) ...[
-          if (memoryFromToday != null && pastMemory != null && memoryFromToday.id != pastMemory.id)
-            _buildComparisonPreviewCard(pastMemory, memoryFromToday, comparisonTitle)
-          else if (pastMemory != null) 
-            _buildSpecialMemoryCard(pastMemory, singleTitle),
-        ],
-
+        // Main Content Area
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(4),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4, childAspectRatio: 0.8,
-            ),
-            itemCount: memories.length,
-            itemBuilder: (context, index) {
-              final entry = memories[index];
-              final isSelected = _selectedForDeletion.contains(entry.id);
-
-              return GestureDetector(
-                onLongPress: () {
-                  setState(() {
-                    _isSelectionMode = true;
-                    _selectedForDeletion.add(entry.id);
-                  });
-                },
-                onTap: () {
-                  if (_isSelectionMode) {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedForDeletion.remove(entry.id);
-                        if (_selectedForDeletion.isEmpty) _isSelectionMode = false;
-                      } else {
-                        _selectedForDeletion.add(entry.id);
-                      }
-                    });
-                  } else {
-                    _showEntryDialog(entry);
-                  }
-                },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children:[
-                      Image.network(entry.imageUrl!, fit: BoxFit.cover),
-                      
-                      Positioned(
-                        bottom: 0, left: 0, right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          color: Colors.black54,
-                          child: Text(_formatDate(entry.createdAt), style: const TextStyle(color: Colors.white, fontSize: 11), textAlign: TextAlign.center),
-                        ),
-                      ),
-
-                      if (_isSelectionMode)
-                        Container(
-                          color: isSelected ? Colors.black54 : Colors.black12,
-                          alignment: Alignment.center,
-                          child: isSelected 
-                              ? const Icon(Icons.check_circle, color: Colors.yellow, size: 36)
-                              : const Icon(Icons.circle_outlined, color: Colors.white70, size: 36),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+          child: _memoriesViewIndex == 0 
+            ? _buildCategoriesView(memories) 
+            : _buildAllPhotosView(memories),
         ),
       ],
+    );
+  }
+
+  // --- KATEGORIJŲ VAIZDAS (Folders View) ---
+  Widget _buildCategoriesView(List<DiaryEntryModel> memories) {
+    // Jei esame aplankalų sąraše:
+    if (_selectedCategoryView == null) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2, 
+          crossAxisSpacing: 16, 
+          mainAxisSpacing: 16, 
+          childAspectRatio: 1.0,
+        ),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final catMemories = memories.where((e) => e.category == cat).toList();
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedCategoryView = cat;
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children:[
+                  const Icon(Icons.folder_special, size: 50, color: Colors.yellow),
+                  const SizedBox(height: 8),
+                  Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text("${catMemories.length} nuotr.", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } 
+    
+    // Jei esame atidarę konkrečią kategoriją:
+    else {
+      final categoryMemories = memories.where((e) => e.category == _selectedCategoryView).toList();
+      
+      return Column(
+        children:[
+          // Header with Back Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Row(
+              children:[
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() {
+                    _selectedCategoryView = null;
+                    _isSelectionMode = false;
+                    _selectedForDeletion.clear();
+                  }),
+                ),
+                Text(
+                  _selectedCategoryView!, 
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                ),
+              ],
+            ),
+          ),
+
+          // PALYGINIMAS TIK ŠIOS KATEGORIJOS VIDUJE
+          if (!_isSelectionMode)
+             _buildComparisonForCategory(categoryMemories),
+
+          Expanded(
+            child: categoryMemories.isEmpty
+                ? const Center(child: Text("Šioje kategorijoje nėra nuotraukų."))
+                : _buildPhotoGrid(categoryMemories),
+          ),
+        ],
+      );
+    }
+  }
+
+  // Lygina nuotraukas TIK atidarytos kategorijos viduje
+  Widget _buildComparisonForCategory(List<DiaryEntryModel> categoryMemories) {
+    if (categoryMemories.length < 2) return const SizedBox.shrink();
+
+    final today = DateTime.now();
+    DiaryEntryModel? memoryFromToday;
+    DiaryEntryModel? pastMemory;
+    String singleTitle = "";
+    String comparisonTitle = "";
+
+    try { memoryFromToday = categoryMemories.firstWhere((e) => e.createdAt.year == today.year && e.createdAt.month == today.month && e.createdAt.day == today.day); } catch (_) {}
+    
+    try {
+      pastMemory = categoryMemories.firstWhere((e) => e.createdAt.year == today.year - 1 && e.createdAt.month == today.month && e.createdAt.day == today.day);
+      singleTitle = "Prieš metus šioje kategorijoje..."; comparisonTitle = "1 Metų Progresas!";
+    } catch (_) {}
+
+    if (pastMemory == null) {
+      final oneMonthAgo = DateTime(today.year, today.month - 1, today.day);
+      try {
+        pastMemory = categoryMemories.firstWhere((e) => e.createdAt.year == oneMonthAgo.year && e.createdAt.month == oneMonthAgo.month && e.createdAt.day == oneMonthAgo.day);
+        singleTitle = "Prieš mėnesį šioje kategorijoje..."; comparisonTitle = "1 Mėnesio Progresas!";
+      } catch (_) {}
+    }
+
+    if (memoryFromToday != null && pastMemory != null && memoryFromToday.id != pastMemory.id) {
+      return _buildComparisonPreviewCard(pastMemory, memoryFromToday, comparisonTitle);
+    } else if (pastMemory != null) {
+      return _buildSpecialMemoryCard(pastMemory, singleTitle);
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  // --- VISŲ NUOTRAUKŲ VAIZDAS ---
+  Widget _buildAllPhotosView(List<DiaryEntryModel> memories) {
+    if (memories.isEmpty) {
+      return const Center(child: Text("Dar nėra jokių nuotraukų."));
+    }
+    return _buildPhotoGrid(memories);
+  }
+
+  // --- BENDRINIS NUOTRAUKŲ TINKLELIS SU CACHING ---
+  Widget _buildPhotoGrid(List<DiaryEntryModel> photos) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(4),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4, childAspectRatio: 0.8,
+      ),
+      itemCount: photos.length,
+      itemBuilder: (context, index) {
+        final entry = photos[index];
+        final isSelected = _selectedForDeletion.contains(entry.id);
+
+        return GestureDetector(
+          onLongPress: () {
+            setState(() {
+              _isSelectionMode = true;
+              _selectedForDeletion.add(entry.id);
+            });
+          },
+          onTap: () {
+            if (_isSelectionMode) {
+              setState(() {
+                if (isSelected) {
+                  _selectedForDeletion.remove(entry.id);
+                  if (_selectedForDeletion.isEmpty) _isSelectionMode = false;
+                } else {
+                  _selectedForDeletion.add(entry.id);
+                }
+              });
+            } else {
+              _showEntryDialog(entry);
+            }
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
+              fit: StackFit.expand,
+              children:[
+                // NAUDOJAMAS CachedNetworkImage Vietoj Image.network!
+                CachedNetworkImage(
+                  imageUrl: entry.imageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(child: CircularProgressIndicator(color: Colors.yellow, strokeWidth: 2)),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                ),
+                
+                Positioned(
+                  bottom: 0, left: 0, right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    color: Colors.black54,
+                    child: Text(_formatDate(entry.createdAt), style: const TextStyle(color: Colors.white, fontSize: 11), textAlign: TextAlign.center),
+                  ),
+                ),
+
+                if (_isSelectionMode)
+                  Container(
+                    color: isSelected ? Colors.black54 : Colors.black12,
+                    alignment: Alignment.center,
+                    child: isSelected 
+                        ? const Icon(Icons.check_circle, color: Colors.yellow, size: 36)
+                        : const Icon(Icons.circle_outlined, color: Colors.white70, size: 36),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -711,14 +880,14 @@ class _DiaryPageState extends State<DiaryPage> {
         ));
       },
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         height: 120,
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          boxShadow: const[BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
           image: DecorationImage(
-            image: NetworkImage(afterEntry.imageUrl!),
+            image: CachedNetworkImageProvider(afterEntry.imageUrl!), // CACHING UPDATE
             fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
           ),
@@ -749,12 +918,12 @@ class _DiaryPageState extends State<DiaryPage> {
     return GestureDetector(
       onTap: () => _showEntryDialog(entry),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         height: 180,
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          boxShadow: const[
+          boxShadow: const [
             BoxShadow(
               color: Colors.black26,
               blurRadius: 8,
@@ -762,7 +931,7 @@ class _DiaryPageState extends State<DiaryPage> {
             )
           ],
           image: DecorationImage(
-            image: NetworkImage(entry.imageUrl!),
+            image: CachedNetworkImageProvider(entry.imageUrl!), // CACHING UPDATE
             fit: BoxFit.cover,
           ),
         ),
@@ -770,7 +939,7 @@ class _DiaryPageState extends State<DiaryPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: const LinearGradient(
-              colors:[Colors.black87, Colors.transparent],
+              colors: [Colors.black87, Colors.transparent],
               begin: Alignment.bottomCenter,
               end: Alignment.center,
             )
@@ -799,7 +968,6 @@ class _DiaryPageState extends State<DiaryPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -831,7 +999,7 @@ class _DiaryPageState extends State<DiaryPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children:[
+            children: [
               Container(
                 padding: const EdgeInsets.all(8), 
                 color: Colors.yellow[100], 
@@ -850,16 +1018,17 @@ class _DiaryPageState extends State<DiaryPage> {
                  const SizedBox(height: 16),
                  ClipRRect(
                    borderRadius: BorderRadius.circular(12),
-                   child: Image.network(
-                     e.imageUrl!,
+                   child: CachedNetworkImage( // CACHING UPDATE
+                     imageUrl: e.imageUrl!,
                      fit: BoxFit.contain,
+                     placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                    ),
                  ),
               ]
             ],
           ),
         ),
-        actions:[
+        actions: [
           TextButton(
             onPressed: () => Navigator.pop(context), 
             child: const Text("Uždaryti")
@@ -895,7 +1064,7 @@ class _DiaryPageState extends State<DiaryPage> {
     return GestureDetector(
       onTap: () => setState(() => selectedMood = _moods[i]),
       child: Column(
-        children:[
+        children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -916,7 +1085,7 @@ class _DiaryPageState extends State<DiaryPage> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children:[
+        children: [
           Text(hint, style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           TextField(
@@ -969,8 +1138,8 @@ class _FullScreenComparisonPageState extends State<FullScreenComparisonPage> {
           aspectRatio: 3 / 4, 
           child: BeforeAfter(
             value: _sliderValue,
-            before: Image.network(widget.afterEntry.imageUrl!, fit: BoxFit.cover),
-            after: Image.network(widget.beforeEntry.imageUrl!, fit: BoxFit.cover),
+            before: CachedNetworkImage(imageUrl: widget.afterEntry.imageUrl!, fit: BoxFit.cover), // CACHING UPDATE
+            after: CachedNetworkImage(imageUrl: widget.beforeEntry.imageUrl!, fit: BoxFit.cover), // CACHING UPDATE
             trackColor: Colors.yellow,
             thumbColor: Colors.yellow,
             onValueChanged: (value) {

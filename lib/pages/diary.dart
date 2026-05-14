@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:before_after/before_after.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // PRIDĖTAS CACHING
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pvp/services/sound_service.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
@@ -33,11 +33,11 @@ class _DiaryPageState extends State<DiaryPage> {
   bool _isSelectionMode = false;
   Set<String> _selectedForDeletion = {};
   
-  // 0 = Kategorijos, 1 = Visos nuotraukos
-  int _memoriesViewIndex = 0; 
-  String? _selectedCategoryView; // Jei null, rodomi aplankalai. Jei tekstas - rodomos tos kategorijos nuotraukos
 
-  // Categories for uploading
+  int _memoriesViewIndex = 0; 
+  String? _selectedCategoryView;
+
+  // categories for uploading
   final List<String> _categories = ['test 1', 'test 2', 'test 3', 'test 4'];
   String _selectedUploadCategory = 'test 1';
 
@@ -203,7 +203,6 @@ class _DiaryPageState extends State<DiaryPage> {
           diaryText: textControllers[3].text,
           preview: preview.length > 50 ? '${preview.substring(0, 47)}...' : preview,
           imageUrl: uploadedImageUrl,
-          // Priskirta kategorija išsaugoma į Firebase
           category: _selectedImage != null ? _selectedUploadCategory : null, 
         ),
       );
@@ -588,7 +587,6 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
-  // --- MEMORIES & FOLDERS LOGIC ---
 
   Widget _buildMemoriesTab(List<DiaryEntryModel> allEntries) {
     final memories = allEntries.where((e) => e.imageUrl != null && e.imageUrl!.isNotEmpty).toList();
@@ -596,7 +594,6 @@ class _DiaryPageState extends State<DiaryPage> {
 
     return Column(
       children:[
-        // Toggle Buttons: Kategorijos vs Visos
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: SegmentedButton<int>(
@@ -608,7 +605,7 @@ class _DiaryPageState extends State<DiaryPage> {
             onSelectionChanged: (newSelection) {
               setState(() {
                 _memoriesViewIndex = newSelection.first;
-                _selectedCategoryView = null; // Reset category view when switching tabs
+                _selectedCategoryView = null;
                 _isSelectionMode = false;
                 _selectedForDeletion.clear();
               });
@@ -622,7 +619,7 @@ class _DiaryPageState extends State<DiaryPage> {
           ),
         ),
 
-        // Ši dalis rodoma pasirinkus nuotraukų trynimą
+ 
         if (_isSelectionMode)
           Container(
             color: Colors.yellow[300],
@@ -657,7 +654,7 @@ class _DiaryPageState extends State<DiaryPage> {
             ),
           ),
 
-        // Main Content Area
+        
         Expanded(
           child: _memoriesViewIndex == 0 
             ? _buildCategoriesView(memories) 
@@ -667,9 +664,8 @@ class _DiaryPageState extends State<DiaryPage> {
     );
   }
 
-  // --- KATEGORIJŲ VAIZDAS (Folders View) ---
   Widget _buildCategoriesView(List<DiaryEntryModel> memories) {
-    // Jei esame aplankalų sąraše:
+    
     if (_selectedCategoryView == null) {
       return GridView.builder(
         padding: const EdgeInsets.all(16),
@@ -711,13 +707,13 @@ class _DiaryPageState extends State<DiaryPage> {
       );
     } 
     
-    // Jei esame atidarę konkrečią kategoriją:
+    
     else {
       final categoryMemories = memories.where((e) => e.category == _selectedCategoryView).toList();
       
       return Column(
         children:[
-          // Header with Back Button
+          
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Row(
@@ -738,7 +734,7 @@ class _DiaryPageState extends State<DiaryPage> {
             ),
           ),
 
-          // PALYGINIMAS TIK ŠIOS KATEGORIJOS VIDUJE
+          
           if (!_isSelectionMode)
              _buildComparisonForCategory(categoryMemories),
 
@@ -752,7 +748,7 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
-  // Lygina nuotraukas TIK atidarytos kategorijos viduje
+  
   Widget _buildComparisonForCategory(List<DiaryEntryModel> categoryMemories) {
     if (categoryMemories.length < 2) return const SizedBox.shrink();
 
@@ -786,7 +782,7 @@ class _DiaryPageState extends State<DiaryPage> {
     return const SizedBox.shrink();
   }
 
-  // --- VISŲ NUOTRAUKŲ VAIZDAS ---
+  
   Widget _buildAllPhotosView(List<DiaryEntryModel> memories) {
     if (memories.isEmpty) {
       return const Center(child: Text("Dar nėra jokių nuotraukų."));
@@ -794,7 +790,7 @@ class _DiaryPageState extends State<DiaryPage> {
     return _buildPhotoGrid(memories);
   }
 
-  // --- BENDRINIS NUOTRAUKŲ TINKLELIS SU CACHING ---
+ 
   Widget _buildPhotoGrid(List<DiaryEntryModel> photos) {
     return GridView.builder(
       padding: const EdgeInsets.all(4),
@@ -832,7 +828,7 @@ class _DiaryPageState extends State<DiaryPage> {
             child: Stack(
               fit: StackFit.expand,
               children:[
-                // NAUDOJAMAS CachedNetworkImage Vietoj Image.network!
+                
                 CachedNetworkImage(
                   imageUrl: entry.imageUrl!,
                   fit: BoxFit.cover,
@@ -887,7 +883,7 @@ class _DiaryPageState extends State<DiaryPage> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
           image: DecorationImage(
-            image: CachedNetworkImageProvider(afterEntry.imageUrl!), // CACHING UPDATE
+            image: CachedNetworkImageProvider(afterEntry.imageUrl!), 
             fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
           ),
@@ -931,7 +927,7 @@ class _DiaryPageState extends State<DiaryPage> {
             )
           ],
           image: DecorationImage(
-            image: CachedNetworkImageProvider(entry.imageUrl!), // CACHING UPDATE
+            image: CachedNetworkImageProvider(entry.imageUrl!), 
             fit: BoxFit.cover,
           ),
         ),
@@ -1018,7 +1014,7 @@ class _DiaryPageState extends State<DiaryPage> {
                  const SizedBox(height: 16),
                  ClipRRect(
                    borderRadius: BorderRadius.circular(12),
-                   child: CachedNetworkImage( // CACHING UPDATE
+                   child: CachedNetworkImage(
                      imageUrl: e.imageUrl!,
                      fit: BoxFit.contain,
                      placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
@@ -1138,8 +1134,8 @@ class _FullScreenComparisonPageState extends State<FullScreenComparisonPage> {
           aspectRatio: 3 / 4, 
           child: BeforeAfter(
             value: _sliderValue,
-            before: CachedNetworkImage(imageUrl: widget.afterEntry.imageUrl!, fit: BoxFit.cover), // CACHING UPDATE
-            after: CachedNetworkImage(imageUrl: widget.beforeEntry.imageUrl!, fit: BoxFit.cover), // CACHING UPDATE
+            before: CachedNetworkImage(imageUrl: widget.afterEntry.imageUrl!, fit: BoxFit.cover),
+            after: CachedNetworkImage(imageUrl: widget.beforeEntry.imageUrl!, fit: BoxFit.cover), 
             trackColor: Colors.yellow,
             thumbColor: Colors.yellow,
             onValueChanged: (value) {

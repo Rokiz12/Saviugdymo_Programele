@@ -12,7 +12,13 @@ import '../services/sound_service.dart';
 
 class CollectionPage extends StatefulWidget {
   final String userId;
-  const CollectionPage({super.key, required this.userId});
+  final VoidCallback? onPetEquipped;
+
+  const CollectionPage({
+    super.key,
+    required this.userId,
+    this.onPetEquipped,
+  });
 
   @override
   State<CollectionPage> createState() => _CollectionPageState();
@@ -131,6 +137,7 @@ class _CollectionPageState extends State<CollectionPage> {
             ownedPets: _ownedPets,
             userId: widget.userId,
             userRepository: _userRepository,
+            onPetEquipped: widget.onPetEquipped,
           );
         }).toList(),
       ),
@@ -159,6 +166,7 @@ class _RaritySection extends StatelessWidget {
   final Map<String, UserPetProgress> ownedPets;
   final String userId;
   final UserRepository userRepository;
+  final VoidCallback? onPetEquipped;
 
   const _RaritySection({
     required this.rarity,
@@ -166,6 +174,7 @@ class _RaritySection extends StatelessWidget {
     required this.ownedPets,
     required this.userId,
     required this.userRepository,
+    this.onPetEquipped,
   });
 
   @override
@@ -229,6 +238,7 @@ class _RaritySection extends StatelessWidget {
               rarityBackColor: Colors.white,
               userId: userId,
               userRepository: userRepository,
+              onPetEquipped: onPetEquipped,
             );
           },
         ),
@@ -246,6 +256,7 @@ class _PetCard extends StatelessWidget {
   final Color rarityBackColor;
   final String userId;
   final UserRepository userRepository;
+  final VoidCallback? onPetEquipped;
 
   const _PetCard({
     required this.pet,
@@ -255,6 +266,7 @@ class _PetCard extends StatelessWidget {
     required this.rarityBackColor,
     required this.userId,
     required this.userRepository,
+    this.onPetEquipped,
   });
 
   void _openPopup(BuildContext context) {
@@ -270,6 +282,7 @@ class _PetCard extends StatelessWidget {
         rarityBackColor: rarityBackColor,
         userId: userId,
         userRepository: userRepository,
+        onPetEquipped: onPetEquipped,
       ),
     );
   }
@@ -357,6 +370,7 @@ class _PetDetailSheet extends StatefulWidget {
   final Color rarityBackColor;
   final String userId;
   final UserRepository userRepository;
+  final VoidCallback? onPetEquipped;
 
   const _PetDetailSheet({
     required this.pet,
@@ -366,6 +380,7 @@ class _PetDetailSheet extends StatefulWidget {
     required this.rarityBackColor,
     required this.userId,
     required this.userRepository,
+    this.onPetEquipped,
   });
 
   @override
@@ -400,6 +415,9 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
 
       if (mounted) {
+        // Call the callback to refresh avatar
+        widget.onPetEquipped?.call();
+
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

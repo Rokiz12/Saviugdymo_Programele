@@ -480,9 +480,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
           children: [
             const Icon(Icons.mood_bad, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text("Nėra nuotaikos duomenų", style: TextStyle(fontSize: 16, color: Colors.grey)),
+            const Text("Nėra šio mėnesio nuotaikos duomenų", style: TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 16),
-            ElevatedButton.icon(onPressed: _loadMonth, icon: const Icon(Icons.refresh), label: const Text("Atnaujinti")),
           ],
         ),
       );

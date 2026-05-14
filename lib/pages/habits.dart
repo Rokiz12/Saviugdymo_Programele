@@ -36,6 +36,9 @@ class _HabitsPageState extends State<HabitsPage> {
 
   ForegroundTimeTracker? _tracker;
 
+  // Counter to force goals section rebuild when habits are updated
+  int _updateCounter = 0;
+
   // ─── INIT ───────────────────────────────────────────────────────────────────
 
   @override
@@ -132,6 +135,7 @@ class _HabitsPageState extends State<HabitsPage> {
     setState(() {
       _today     = log;
       _monthLogs = List.from(_monthLogs); // trigger rebuild
+      _updateCounter++; // Force goals section to rebuild
     });
 
     _repo.upsertDayLog(userId: widget.userId, log: log);
@@ -346,11 +350,30 @@ class _HabitsPageState extends State<HabitsPage> {
   void _setValue(Habit h, RatingValue v) {
     SoundService.playMarkHabit();
 
+    final now    = DateTime.now().toUtc();
+    final logDay = DateTime.utc(now.year, now.month, now.day);
+
     final newLog = (_today ??
-        DayLog(dateUtc: DateTime.now().toUtc(), entries: {}))
+        DayLog(dateUtc: logDay, entries: {}))
         .setValue(h.id, v);
 
-    setState(() => _today = newLog);
+    // ── keep _monthLogs in sync so goal progress reads the same value ──
+    final idx = _monthLogs.indexWhere(
+          (l) => l.dateUtc.year  == logDay.year &&
+          l.dateUtc.month == logDay.month &&
+          l.dateUtc.day   == logDay.day,
+    );
+    if (idx >= 0) {
+      _monthLogs[idx] = newLog;
+    } else {
+      _monthLogs.add(newLog);
+    }
+
+    setState(() {
+      _today = newLog;
+      _monthLogs = List.from(_monthLogs); // trigger rebuild
+      _updateCounter++; // Force goals section to rebuild
+    });
     _repo.upsertDayLog(userId: widget.userId, log: newLog);
   }
 
@@ -421,7 +444,10 @@ class _HabitsPageState extends State<HabitsPage> {
         if (day.year == now.year &&
             day.month == now.month &&
             day.day == now.day) {
-          setState(() => _today = log);
+          setState(() {
+            _today = log;
+            _updateCounter++; // Force goals section to rebuild
+          });
         }
       },
     )..start();
@@ -525,6 +551,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
   Widget _buildGoalsSection() {
     return Container(
+      key: ValueKey(_updateCounter), // Force rebuild when habits are updated
       width: 450,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 2),
@@ -610,7 +637,7 @@ class _HabitsPageState extends State<HabitsPage> {
               ),
             ),
             SizedBox(
-              width: 24,
+              width: 36,
               child: Center(
                 child: Text("$numVal", style: const TextStyle(fontSize: 14)),
               ),
@@ -713,3 +740,4 @@ class _HabitsPageState extends State<HabitsPage> {
     }
   }
 }
+

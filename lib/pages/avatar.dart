@@ -12,10 +12,10 @@ class AvatarPage extends StatefulWidget {
   const AvatarPage({super.key, required this.userId});
 
   @override
-  State<AvatarPage> createState() => _AvatarPageState();
+  State<AvatarPage> createState() => AvatarPageState();
 }
 
-class _AvatarPageState extends State<AvatarPage>
+class AvatarPageState extends State<AvatarPage>
     with SingleTickerProviderStateMixin {
   final UserRepository _userRepository = UserRepository();
   final PetRepository _petRepository = PetRepository();
@@ -97,6 +97,12 @@ class _AvatarPageState extends State<AvatarPage>
     });
   }
 
+  Future<void> refreshData() async {
+    setState(() {
+      _dataFuture = _fetchData();
+    });
+  }
+
   @override
   void dispose() {
     _floatingController.dispose();
@@ -140,14 +146,14 @@ class _AvatarPageState extends State<AvatarPage>
         final petRarity = pet?.rarity ?? "Common";
         final duplicateCount = petProgress?.duplicateCount ?? 0;
         final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
-        
+
         final imageUrl = pet?.images[imageKey] ??
             pet?.images.values.firstOrNull ??
             '';
-            
-        final streak = user.streak; 
 
-        
+        final streak = user.streak;
+
+
         return Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -180,7 +186,7 @@ class _AvatarPageState extends State<AvatarPage>
 
                 const SizedBox(height: 24),
 
-                
+
                 SizedBox(
                   height: 290,
                   child: Stack(
@@ -247,7 +253,7 @@ class _AvatarPageState extends State<AvatarPage>
                                       child: ClipOval(
                                         child: imageUrl.isEmpty
                                             ? const Icon(Icons.pets, size: 120)
-                                            : CachedNetworkImage( 
+                                            : CachedNetworkImage(
                                                 imageUrl: imageUrl,
                                                 fit: BoxFit.cover,
                                                 width: 220,
@@ -279,8 +285,8 @@ class _AvatarPageState extends State<AvatarPage>
                           duration: const Duration(milliseconds: 200),
                           child: AnimatedSlide(
                             offset: _bubbleVisible
-                                ? Offset.zero
-                                : const Offset(0, 0.08),
+                              ? Offset.zero
+                              : const Offset(0, 0.08),
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeOut,
                             child: IgnorePointer(
@@ -294,7 +300,7 @@ class _AvatarPageState extends State<AvatarPage>
                   ),
                 ),
 
-                
+
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
                   child: _quotesLoaded && _quotes.isNotEmpty

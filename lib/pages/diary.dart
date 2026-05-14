@@ -23,6 +23,91 @@ class DiaryPage extends StatefulWidget {
 }
 
 class _DiaryPageState extends State<DiaryPage> {
+
+  DateTime _weekStart() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day - (now.weekday - 1));
+  }
+
+  /// Counts diary entries created this week
+  int _entriesThisWeek(List<DiaryEntryModel> entries) {
+    final start = _weekStart();
+    return entries.where((e) => !e.createdAt.isBefore(start)).length;
+  }
+
+  /// Counts entries with photos created this week
+  int _photosThisWeek(List<DiaryEntryModel> entries) {
+    final start = _weekStart();
+    return entries
+        .where((e) =>
+    !e.createdAt.isBefore(start) &&
+        e.imageUrl != null &&
+        e.imageUrl!.isNotEmpty)
+        .length;
+  }
+
+  void _showUpgradeDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Text('⭐', style: TextStyle(fontSize: 22)),
+            SizedBox(width: 8),
+            Text('Premium funkcija',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.yellow[50],
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.yellow[300]!),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Premium privalumai:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 6),
+                  Text('✅ Neriboti dienoraščio įrašai'),
+                  Text('✅ Neriboti nuotraukų prisegimas'),
+                  Text('✅ Visi statistikos įrankiai'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vėliau'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: navigate to your upgrade/paywall page
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.yellow,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Gauti Premium',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   final DiaryRepository _repository = DiaryRepository();
   final DiaryQuestionRepository _questionRepository = DiaryQuestionRepository();
   
@@ -53,11 +138,23 @@ class _DiaryPageState extends State<DiaryPage> {
   final List<String> _moods =['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
   final List<String> _moodEmojis =['😀', '🙂', '😐', '😢', '😭'];
 
+  bool _isPremium = false;
+
   @override
   void initState() {
     super.initState();
     _loadQuestions();
+    _loadUserPremiumStatus();
   }
+
+  Future<void> _loadUserPremiumStatus() async {
+    final user = await UserRepository().getUser(_userId);
+    if (user != null && mounted) {
+      setState(() => _isPremium = user.premium);
+    }
+  }
+
+
 
   Future<void> _loadQuestions() async {
     try {
@@ -102,7 +199,20 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   void _showImagePickerOptions() {
-    showModalBottomSheet(
+    // --- PREMIUM GATE ---
+    if (!_isPremium) {
+      final allEntries = _entriesByDate.values.expand((e) => e).toList();
+      if (_photosThisWeek(allEntries) >= 3) {
+        _showUpgradeDialog(
+          'Nemokamoje versijoje galima prisegti tik 3 nuotraukas per savaitę.\n\n'
+              'Ši savaitė: ${_photosThisWeek(allEntries)} / 3 nuotraukos.',
+        );
+        return;
+      }
+    }
+    // --- END GATE ---
+
+    showModalBottomSheet(  // rest of existing method unchanged
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -135,6 +245,18 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Future<void> _saveEntry() async {
+
+    if (!_isPremium) {
+      final allEntries = _entriesByDate.values.expand((e) => e).toList();
+      if (_entriesThisWeek(allEntries) >= 2) {
+        _showUpgradeDialog(
+          'Nemokamoje versijoje galima pridėti tik 2 įrašus per savaitę.\n\n'
+              'Ši savaitė: ${_entriesThisWeek(allEntries)} / 2 įrašai.',
+        );
+        return;
+      }
+    }
+
     if (selectedMood.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -418,6 +540,7 @@ class _DiaryPageState extends State<DiaryPage> {
           const SizedBox(height: 32), 
 
           ElevatedButton(
+
             onPressed: _saveEntry,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.yellow,

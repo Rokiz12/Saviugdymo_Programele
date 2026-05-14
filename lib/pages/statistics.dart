@@ -99,6 +99,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
         habitsLogged: habitsLogged,
       );
 
+
+
       if (best == null || stats.completionRate > best.completionRate) {
         best = stats;
       }
@@ -452,6 +454,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           const SizedBox(height: 32),
 
+          _PremiumBanner(),
+          const SizedBox(height: 24),
+
           if (best != null)
             BestMonthCard(
               monthName: DateFormat.yMMMM().format(best.month),
@@ -545,5 +550,71 @@ class _Weekday extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(child: Center(child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))));
+  }
+}
+class _PremiumBanner extends StatelessWidget {
+  const _PremiumBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.yellow[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.yellow[300]!),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.yellow[200],
+              shape: BoxShape.circle,
+            ),
+            child: const Text('⭐', style: TextStyle(fontSize: 22)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '66 days premium',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Neriboti įrašai, nuotraukos ir išsami statistika.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () {
+              // TODO: navigate to paywall
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.yellow[700],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Gauti',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

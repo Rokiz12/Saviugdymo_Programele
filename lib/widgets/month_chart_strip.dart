@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import '../services/theme_notifier.dart';
+import '../theme/app_theme.dart';
 
 class MonthChartStrip extends StatefulWidget {
   final DateTime initialMonth;
@@ -64,6 +66,7 @@ class _MonthChartStripState extends State<MonthChartStrip> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SizedBox(
       height: 110,
       child: Stack(
@@ -95,14 +98,14 @@ class _MonthChartStripState extends State<MonthChartStrip> {
                       horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: active
-                        ? const Color(0xFFD4537E)
-                        : Colors.grey.shade200.withOpacity(0.65),
+                        ? colors.intenseColor
+                        : colors.background2,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     _label(month),
                     style: TextStyle(
-                      color: active ? Colors.white : Colors.black87,
+                      color: colors.textColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),

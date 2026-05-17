@@ -3,12 +3,18 @@ import '../services/auth_service.dart';
 import 'questionaire.dart';
 import '../widgets/custom_app_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/theme_notifier.dart';
+import '../theme/app_theme.dart';
+import 'package:provider/provider.dart';
+
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeNotifier = context.read<ThemeNotifier>();
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: const CustomAppBar(title: "Nustatymai"),
@@ -43,14 +49,14 @@ class SettingsPage extends StatelessWidget {
               _SettingsRadioTile(
                 icon: Icons.light_mode,
                 title: "Šviesi",
-                isSelected: true,
-                onTap: () {},
+                isSelected: themeNotifier.mode == AppMode.light,
+                onTap: () => themeNotifier.setMode(AppMode.light),
               ),
               _SettingsRadioTile(
                 icon: Icons.dark_mode,
                 title: "Tamsi",
-                isSelected: false,
-                onTap: () {},
+                isSelected: themeNotifier.mode == AppMode.dark,
+                onTap: () => themeNotifier.setMode(AppMode.dark),
               ),
             ],
           ),

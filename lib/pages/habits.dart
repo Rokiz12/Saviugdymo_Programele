@@ -13,6 +13,10 @@ import '../widgets/custom_app_bar.dart';
 import '../data/repositories/user_repository.dart';
 import '../services/reward_notifier.dart';
 import '../services/reward_service.dart';
+import '../widgets/reusables.dart';
+import '../services/theme_notifier.dart';
+import '../theme/app_theme.dart';
+
 
 
 class HabitsPage extends StatefulWidget {
@@ -131,7 +135,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
     setState(() {
       _today     = log;
-      _monthLogs = List.from(_monthLogs); // trigger rebuild
+      _monthLogs = List.from(_monthLogs);
     });
 
     _repo.upsertDayLog(userId: widget.userId, log: log);
@@ -437,6 +441,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
   @override
   Widget build(BuildContext context) {
+
     if (_today == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -444,11 +449,11 @@ class _HabitsPageState extends State<HabitsPage> {
     return Scaffold(
       appBar: const CustomAppBar(title: "Įpročiai"),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           children: [
             _buildHabitsSection(),
-            const SizedBox(height: 30),
+            const SizedBox(height: 80),
             _buildGoalsSection(),
           ],
         ),
@@ -456,122 +461,156 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
-  Widget _buildHabitsSection() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          ListView.separated(
-            separatorBuilder: (_, __) =>
-            const Divider(height: 1, color: Colors.black12),
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _habits.length,
-            itemBuilder: (context, index) {
-              final h = _habits[index];
-              final v = _today!.entries[h.id];
 
-              // Step habits need more vertical space for the progress bar
-              final rowHeight = h.kind == RatingKind.steps ? 64.0 : 44.0;
+// ─── FAB ADD BUTTON ──────────────────────────────────────────────────────────
 
-              return SizedBox(
-                height: rowHeight,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: h.systemOnly ? null : () => _editHabit(h),
-                        onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(
-                            children: [
-                              if (h.icon != null) ...[
-                                Icon(habitIconData(h.icon), size: 20),
-                                const SizedBox(width: 8),
-                              ],
-                              Text(h.name,
-                                  style: const TextStyle(fontSize: 16)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _buildTrailingFor(h, v),
-                    ),
-                  ],
-                ),
-              );
-            },
+  Widget _fabAdd(VoidCallback onTap) {
+    final colors = context.colors;
+
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: colors.intenseColor,
+            shape: BoxShape.circle,
           ),
-
-          const Divider(height: 1, color: Colors.black),
-
-          TextButton.icon(
-            onPressed: _addHabit,
-            icon: const Icon(Icons.add, color: Colors.black),
-            label: const Text("Pridėti įprotį",
-                style: TextStyle(color: Colors.black)),
-          ),
-        ],
+          child: const Icon(Icons.add, color: Colors.black, size: 22),
+        ),
       ),
     );
   }
 
-  Widget _buildGoalsSection() {
-    return Container(
-      width: 450,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _goals.length,
-            itemBuilder: (context, index) {
-              final g        = _goals[index];
-              final progress = _calculateGoalProgress(g);
-              final percent  = (progress / g.target).clamp(0.0, 1.0);
+// ─── HABITS SECTION ──────────────────────────────────────────────────────────
 
-              return ListTile(
-                title: Text(g.name),
-                subtitle: Column(
+  Widget _buildHabitsSection() {
+    final colors = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader("Tavo įpročiai"),
+        const SizedBox(height: 10),
+
+        ..._habits.map((h) {
+          final v = _today!.entries[h.id];
+          final rowHeight = h.kind == RatingKind.steps ? 74.0 : 56.0;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            height: rowHeight,
+            decoration: BoxDecoration(
+              color: colors.background2,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.background, width: 0.5),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: h.systemOnly ? null : () => _editHabit(h),
+              onLongPress: h.systemOnly ? null : () => _deleteHabit(h),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    if (h.icon != null) ...[
+                      Icon(habitIconData(h.icon),
+                          size: 18, color: colors.appBarUnpickedColor),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: Text(
+                        h.name,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colors.textColor,
+                        ),
+                      ),
+                    ),
+                    _buildTrailingFor(h, v),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+
+        const SizedBox(height: 4),
+        _fabAdd(_addHabit),
+      ],
+    );
+  }
+
+// ─── GOALS SECTION ───────────────────────────────────────────────────────────
+
+  Widget _buildGoalsSection() {
+    final colors = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader("Tavo tikslai"),
+        const SizedBox(height: 10),
+
+        if (_goals.isEmpty)
+          const SizedBox.shrink()
+        else
+          ..._goals.map((g) {
+            final progress = _calculateGoalProgress(g);
+            final percent = (progress / g.target).clamp(0.0, 1.0);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              decoration: BoxDecoration(
+                color: colors.background2,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colors.background, width: 0.5),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _editGoal(g),
+                onLongPress: () => _deleteGoal(g),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("$progress / ${g.target}"),
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: percent,
-                      backgroundColor: Colors.grey[300],
-                      color: percent >= 1 ? Colors.green : Colors.blue,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(g.name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colors.textColor,
+                            )),
+                        Text(
+                          "$progress / ${g.target}",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colors.appBarUnpickedColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: percent,
+                        minHeight: 6,
+                        backgroundColor: colors.background,
+                        color: percent >= 1 ? Colors.green : colors.intenseColor,
+                      ),
                     ),
                   ],
                 ),
-                trailing: Text("${(percent * 100).round()}%"),
-                onTap: () => _editGoal(g),
-                onLongPress: () => _deleteGoal(g),
-              );
-            },
-          ),
+              ),
+            );
+          }),
 
-          const Divider(height: 1),
-
-          TextButton.icon(
-            onPressed: _addGoal,
-            icon: const Icon(Icons.add, color: Colors.black),
-            label: const Text("Pridėti Tikslą",
-                style: TextStyle(color: Colors.black)),
-          ),
-        ],
-      ),
+        const SizedBox(height: 4),
+        _fabAdd(_addGoal),
+      ],
     );
   }
 

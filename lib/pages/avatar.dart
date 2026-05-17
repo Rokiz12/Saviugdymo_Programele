@@ -6,6 +6,7 @@ import '../data/repositories/user_repository.dart';
 import '../data/repositories/pet_repository.dart';
 import "package:cached_network_image/cached_network_image.dart";
 import '../data/repositories/quote_repository.dart';
+import '../theme/app_theme.dart';
 
 class AvatarPage extends StatefulWidget {
   final String userId;
@@ -28,7 +29,7 @@ class _AvatarPageState extends State<AvatarPage>
   late Future<(UserModel?, PetModel?)> _dataFuture;
 
   // speech bubble state
-  List<String> _quotes =[];
+  List<String> _quotes = [];
   String _currentQuote = '';
   bool _bubbleVisible = false;
   bool _quotesLoaded = false;
@@ -40,7 +41,8 @@ class _AvatarPageState extends State<AvatarPage>
     _floatingController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
+    )
+      ..repeat(reverse: true);
 
     _floatingAnimation = Tween<double>(begin: -3.0, end: 3.0).animate(
       CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
@@ -105,476 +107,281 @@ class _AvatarPageState extends State<AvatarPage>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return FutureBuilder<(UserModel?, PetModel?)>(
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
-        if (!snapshot.hasData || snapshot.data == null) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: Text("User not found")),
-          );
-        }
-
-        final (user, pet) = snapshot.data!;
+        final (user, pet) = snapshot.data ?? (null, null);
         if (user == null) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: Text("User not found")),
-          );
+          return const Center(child: Text("User not found"));
         }
 
         final petProgress = user.ownedPets[user.equippedPetId];
         final userXp = user.xp;
         final userLevel = user.level;
-        final nextLevelXp = 100;
-        final progress = nextLevelXp == 0 ? 0.0 : userXp / nextLevelXp;
-
+        const nextLevelXp = 100;
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
         final duplicateCount = petProgress?.duplicateCount ?? 0;
         final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
-        
         final imageUrl = pet?.images[imageKey] ??
-            pet?.images.values.firstOrNull ??
-            '';
-            
-        final streak = user.streak; 
+            pet?.images.values.firstOrNull ?? '';
+        final streak = user.streak;
 
-        
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors:[Color(0xfff5e1), Color(0xfff5e1)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors:[Color(0xFFF6F8FF), Color(0xFFE9EEFF)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children:[
-                const SizedBox(height: 32),
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
 
-                Text(
-                  petName,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF2D3142),
-                  ),
+              // ── Pet image card ──────────────────────────────────────
+              Container(
+                decoration: BoxDecoration(
+                  color: colors.background2,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-
-                const SizedBox(height: 24),
-
-                
-                SizedBox(
-                  height: 290,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.bottomCenter,
-                    children:[
-                      Positioned(
-                        bottom: 0,
-                        child: AnimatedBuilder(
-                          animation: _floatingAnimation,
-                          builder: (context, child) {
-                            return Transform.translate(
-                              offset: Offset(0, _floatingAnimation.value),
-                              child: child,
-                            );
-                          },
-                          child: AnimatedScale(
-                            scale: _avatarScale,
-                            duration: const Duration(milliseconds: 150),
-                            curve: Curves.easeOutCubic,
-                            child: GestureDetector(
-                              onTapDown: (_) =>
-                                  setState(() => _avatarScale = 0.92),
-                              onTapUp: (_) {
-                                setState(() => _avatarScale = 1.0);
-                                if (_bubbleVisible) {
-                                  _dismissBubble();
-                                } else {
-                                  _onAvatarTap(petName);
-                                }
-                              },
-                              onTapCancel: () =>
-                                  setState(() => _avatarScale = 1.0),
-                              child: Container(
-                                width: 220,
-                                height: 220,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow:[
-                                    BoxShadow(
-                                      color: Colors.purpleAccent.withOpacity(0.4),
-                                      blurRadius: 30,
-                                      spreadRadius: 5,
-                                      offset: const Offset(0, 10),
-                                    )
-                                  ],
-                                ),
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children:[
-                                    Container(
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.purpleAccent,
-                                            Colors.deepPurple
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(6.0),
-                                      child: ClipOval(
-                                        child: imageUrl.isEmpty
-                                            ? const Icon(Icons.pets, size: 120)
-                                            : CachedNetworkImage( 
-                                                imageUrl: imageUrl,
-                                                fit: BoxFit.cover,
-                                                width: 220,
-                                                height: 220,
-                                                memCacheWidth: 512,
-                                                memCacheHeight: 512,
-                                                placeholder: (context, url) =>
-                                                    const Center(
-                                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                                    ),
-                                                errorWidget: (context, url, error) =>
-                                                    const Icon(Icons.pets, size: 120),
-                                              ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                padding: const EdgeInsets.symmetric(
+                    vertical: 24, horizontal: 20),
+                child: Column(
+                  children: [
+                    // Speech bubble
+                    AnimatedOpacity(
+                      opacity: _bubbleVisible ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: AnimatedSlide(
+                        offset: _bubbleVisible ? Offset.zero : const Offset(
+                            0, 0.08),
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        child: IgnorePointer(
+                          ignoring: !_bubbleVisible,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 46, vertical: 22),
+                            decoration: BoxDecoration(
+                              color: colors.primary,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              _currentQuote,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: colors.textColor,
                               ),
                             ),
                           ),
                         ),
                       ),
+                    ),
 
-                      // speech bubble
-                      Positioned(
-                        top: 0,
-                        child: AnimatedOpacity(
-                          opacity: _bubbleVisible ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: AnimatedSlide(
-                            offset: _bubbleVisible
-                                ? Offset.zero
-                                : const Offset(0, 0.08),
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOut,
-                            child: IgnorePointer(
-                              ignoring: !_bubbleVisible,
-                              child: _SpeechBubble(text: _currentQuote),
+                    // Pet image
+                    AnimatedBuilder(
+                      animation: _floatingAnimation,
+                      builder: (context, child) =>
+                          Transform.translate(
+                            offset: Offset(0, _floatingAnimation.value),
+                            child: child,
+                          ),
+                      child: AnimatedScale(
+                        scale: _avatarScale,
+                        duration: const Duration(milliseconds: 150),
+                        curve: Curves.easeOutCubic,
+                        child: GestureDetector(
+                          onTapDown: (_) => setState(() => _avatarScale = 0.92),
+                          onTapUp: (_) {
+                            setState(() => _avatarScale = 1.0);
+                            _bubbleVisible ? _dismissBubble() : _onAvatarTap(
+                                petName);
+                          },
+                          onTapCancel: () => setState(() => _avatarScale = 1.0),
+                          child: SizedBox(
+                            width: 180,
+                            height: 180,
+                            child: imageUrl.isEmpty
+                                ? const Icon(Icons.pets, size: 100)
+                                : CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.contain,
+                              memCacheWidth: 512,
+                              memCacheHeight: 512,
+                              placeholder: (_, __) =>
+                              const Center(
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2),
+                              ),
+                              errorWidget: (_, __, ___) =>
+                              const Icon(Icons.pets, size: 100),
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: _quotesLoaded && _quotes.isNotEmpty
-                      ? Text(
-                    _bubbleVisible
-                        ? 'Paspausk, kad paslėptum'
-                        : 'Paspausk motyvacijai!',
-                    key: ValueKey(_bubbleVisible),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.purple.withOpacity(0.6),
-                      fontStyle: FontStyle.italic,
                     ),
-                  )
-                      : const SizedBox.shrink(),
-                ),
 
-                const SizedBox(height: 16),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.purple.withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    petRarity,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: Colors.purple,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 36),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow:[
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        )
-                      ],
-                    ),
-                    child: Column(
-                      children:[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children:[
-                            Text("Level $userLevel",
-                                style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF2D3142))),
-                            Text("$userXp / $nextLevelXp XP",
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey)),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        TweenAnimationBuilder<double>(
-                          tween: Tween<double>(begin: 0, end: progress),
-                          duration: const Duration(milliseconds: 1200),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, value, child) {
-                            return Stack(
-                              children:[
-                                Container(
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                FractionallySizedBox(
-                                  widthFactor: value,
-                                  child: Container(
-                                    height: 18,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      gradient: const LinearGradient(
-                                        colors:[
-                                          Colors.orangeAccent,
-                                          Colors.deepOrange
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children:[
-                      Expanded(
-                        child: _StatCard(
-                          title: "Daily Streak",
-                          value: "$streak d.",
-                          icon: Icons.local_fire_department_rounded,
-                          iconColor: Colors.deepOrange,
-                          bgColor: Colors.deepOrange.shade50,
-                        ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _bubbleVisible
+                          ? 'Paspausk, kad paslėptum'
+                          : 'Paspausk motyvacijai!',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.appBarUnpickedColor,
+                        fontStyle: FontStyle.italic,
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _StatCard(
-                          title: "Total XP",
-                          value: userXp.toString(),
-                          icon: Icons.star_rounded,
-                          iconColor: Colors.blue,
-                          bgColor: Colors.blue.shade50,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
 
-                const SizedBox(height: 40),
-              ],
-            ),
+              const SizedBox(height: 10),
+
+              // ── Name + level card ────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 16),
+                decoration: BoxDecoration(
+                  color: colors.background2,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            petName,
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              color: colors.textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '"${petRarity}"',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.appBarUnpickedColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Level circle
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: colors.background2,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: colors.intenseColor, width: 2),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$userLevel',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              color: colors.intenseColor,
+                              height: 1,
+                            ),
+                          ),
+                          Text(
+                            'Lygis',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colors.intenseColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // ── Stats + Apranga card ─────────────────────────────────
+        Row(
+        children: [
+        // Stats card
+        Expanded(
+        child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+        color: colors.background2,
+        borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+        _StatRow('Dienų streakas', '$streak', colors),
+        const SizedBox(height: 8),
+        _StatRow('Patirties taškai', '$userXp | $nextLevelXp', colors),
+        ],
+        ),
+        ),
+        ),
+
+        const SizedBox(width: 10),
+
+        // Apranga card
+        GestureDetector(
+        onTap: () {
+        // TODO: open wardrobe
+        },
+        child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+        decoration: BoxDecoration(
+        color: colors.primary,
+        borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+        'Apranga',
+        style: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: colors.textColor,
+        ),
+        ),
+        ),
+        ),
+        ],
+        ),
+            ],
           ),
         );
       },
     );
+
   }
-}
 
-
-
-class _SpeechBubble extends StatelessWidget {
-  final String text;
-
-  const _SpeechBubble({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children:[
-        Container(
-          constraints: const BoxConstraints(maxWidth: 220),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow:[
-              BoxShadow(
-                color: Colors.purple.withOpacity(0.15),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-            border: Border.all(
-              color: Colors.purple.withOpacity(0.18),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2D3142),
-              height: 1.45,
-            ),
-          ),
-        ),
-
-        CustomPaint(
-          size: const Size(20, 10),
-          painter: _BubbleTailPainter(),
-        ),
+  Widget _StatRow(String label, String value, AppColors colors) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: TextStyle(fontSize: 13, color: colors.textColor)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: colors.textColor)),
       ],
     );
   }
-}
-
-class _BubbleTailPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = Colors.purple.withOpacity(0.18)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-
-    canvas.drawPath(path, fillPaint);
-    canvas.drawPath(path, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow:[
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          )
-        ],
-      ),
-      child: Column(
-        children:[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration:
-            BoxDecoration(color: bgColor, shape: BoxShape.circle),
-            child: Icon(icon, size: 28, color: iconColor),
-          ),
-          const SizedBox(height: 12),
-          Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  color: Color(0xFF2D3142))),
-          const SizedBox(height: 4),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey)),
-        ],
-      ),
-    );
-  }
 }

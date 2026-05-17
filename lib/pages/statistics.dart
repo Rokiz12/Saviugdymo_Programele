@@ -8,6 +8,7 @@ import '../widgets/month_chart_strip.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 import '../widgets/best_month_card.dart';
+import '../theme/app_theme.dart';
 
 
 class _MonthStats {
@@ -296,6 +297,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
+
     if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -336,6 +338,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   Widget _buildHabitsTab(DateTime firstDayOfMonth, int daysInMonth,
       int firstWeekday, int totalCells) {
+    final colors = context.colors;
+
     final best = _computeBestMonth();
 
     // Stats across the historical window (excluding current month)
@@ -436,14 +440,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 final date = DateTime(_currentMonth.year, _currentMonth.month, day);
                 final isToday = DateUtils.isSameDay(DateTime.now(), date);
                 final ratio = _completionRatioForDay(date);
-                final bgColor = ratio == 0 ? Colors.grey.shade200
-                    : Color.lerp(Colors.green.shade100, Colors.green.shade700, ratio.clamp(0, 1))!;
+                final bgColor = ratio == 0 ? colors.background2
+                    : Color.lerp(colors.background2, colors.intenseColor, ratio.clamp(0, 1))!;
 
                 return Container(
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: BorderRadius.circular(8),
-                    border: isToday ? Border.all(color: Colors.black, width: 2) : null,
+                    border: isToday ? Border.all(color: colors.intenseColor, width: 2) : null,
                   ),
                   child: Center(
                     child: Text("$day", style: TextStyle(fontWeight: isToday ? FontWeight.bold : FontWeight.normal))),
@@ -545,11 +549,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
 }
 
 class _Weekday extends StatelessWidget {
+
   final String label;
   const _Weekday(this.label);
   @override
   Widget build(BuildContext context) {
-    return Expanded(child: Center(child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))));
+    final colors = context.colors;
+    return Expanded(child: Center(child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: colors.textColor))));
   }
 }
 class _PremiumBanner extends StatelessWidget {
@@ -557,20 +563,21 @@ class _PremiumBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.yellow[50],
+        color: colors.background2,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.yellow[300]!),
+        border: Border.all(color: colors.intenseColor.withOpacity(0.4)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.yellow[200],
+              color: colors.primary,
               shape: BoxShape.circle,
             ),
             child: const Text('⭐', style: TextStyle(fontSize: 22)),
@@ -600,7 +607,7 @@ class _PremiumBanner extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.yellow[700],
+                color: colors.intenseColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(

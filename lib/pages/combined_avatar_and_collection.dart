@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pvp/pages/avatar.dart';
 import 'package:pvp/pages/minigames.dart';
 import '../widgets/custom_app_bar.dart';
+import '../theme/app_theme.dart';
 
 class CombinedAvatarAndCollectionPage extends StatefulWidget {
   final String userId;
@@ -27,8 +28,10 @@ class _CombinedAvatarAndCollectionPageState extends State<CombinedAvatarAndColle
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: colors.background,
 
       appBar:CustomAppBar(title: "Avataras"),
 

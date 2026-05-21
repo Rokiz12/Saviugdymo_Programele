@@ -8,6 +8,7 @@ import '../widgets/month_chart_strip.dart';
 import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 import '../widgets/best_month_card.dart';
+import '../theme/app_theme.dart';
 
 
 class _MonthStats {
@@ -98,6 +99,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
         longestStreak: longestStreak,
         habitsLogged: habitsLogged,
       );
+
+
 
       if (best == null || stats.completionRate > best.completionRate) {
         best = stats;
@@ -294,6 +297,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
+
     if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -334,6 +338,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   Widget _buildHabitsTab(DateTime firstDayOfMonth, int daysInMonth,
       int firstWeekday, int totalCells) {
+    final colors = context.colors;
+
     final best = _computeBestMonth();
 
     // Stats across the historical window (excluding current month)
@@ -434,14 +440,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 final date = DateTime(_currentMonth.year, _currentMonth.month, day);
                 final isToday = DateUtils.isSameDay(DateTime.now(), date);
                 final ratio = _completionRatioForDay(date);
-                final bgColor = ratio == 0 ? Colors.grey.shade200
-                    : Color.lerp(Colors.green.shade100, Colors.green.shade700, ratio.clamp(0, 1))!;
+                final bgColor = ratio == 0 ? colors.background2
+                    : Color.lerp(colors.background2, colors.intenseColor, ratio.clamp(0, 1))!;
 
                 return Container(
                   decoration: BoxDecoration(
                     color: bgColor,
                     borderRadius: BorderRadius.circular(8),
-                    border: isToday ? Border.all(color: Colors.black, width: 2) : null,
+                    border: isToday ? Border.all(color: colors.intenseColor, width: 2) : null,
                   ),
                   child: Center(
                     child: Text("$day", style: TextStyle(fontWeight: isToday ? FontWeight.bold : FontWeight.normal))),
@@ -451,6 +457,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
           ),
 
           const SizedBox(height: 32),
+
+          _PremiumBanner(),
+          const SizedBox(height: 24),
 
           if (best != null)
             BestMonthCard(
@@ -539,10 +548,79 @@ class _StatisticsPageState extends State<StatisticsPage> {
 }
 
 class _Weekday extends StatelessWidget {
+
   final String label;
   const _Weekday(this.label);
   @override
   Widget build(BuildContext context) {
-    return Expanded(child: Center(child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))));
+    final colors = context.colors;
+    return Expanded(child: Center(child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: colors.textColor))));
+  }
+}
+class _PremiumBanner extends StatelessWidget {
+  const _PremiumBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: colors.background2,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.intenseColor.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: colors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: const Text('⭐', style: TextStyle(fontSize: 22)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '66 days premium',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Neriboti įrašai, nuotraukos ir išsami statistika.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () {
+              // TODO: navigate to paywall
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.intenseColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Gauti',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

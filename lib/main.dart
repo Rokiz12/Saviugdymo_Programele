@@ -15,16 +15,21 @@ import 'services/image_preloader.dart';
 import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
 import 'services/fcm_service.dart';
+import 'services/theme_notifier.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   preloadPetImages();
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => RewardNotifier(),
-      child: const MyApp(),
-    ),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => RewardNotifier()),
+          ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+        ],
+        child: const MyApp(),
+      )
   );
 }
 
@@ -33,7 +38,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeNotifier = context.watch<ThemeNotifier>();
+
     return MaterialApp(
+      theme: AppTheme.of(themeNotifier.mode),
       debugShowCheckedModeBanner: false,
 
       routes:{
@@ -68,7 +76,7 @@ class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
   late RewardNotifier _rewardNotifier;
   bool _rewardDialogShowing = false;
-  int selectedIndex = 0;
+  int selectedIndex = 2;
   late TabController tabController;
   late List<Widget> pages;
 

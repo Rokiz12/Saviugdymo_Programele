@@ -33,6 +33,7 @@ class _CollectionPageState extends State<CollectionPage> {
   bool _isLoading = true;
   String? _error;
   StreamSubscription? _userSubscription;
+  String? _equippedPetId;
 
   @override
   void dispose() {
@@ -67,7 +68,10 @@ class _CollectionPageState extends State<CollectionPage> {
         if (!mounted) return;
         if (doc.exists) {
           final user = UserModel.fromMap(doc.id, doc.data()!);
-          setState(() => _ownedPets = user.ownedPets);
+          setState(() {
+            _ownedPets = user.ownedPets;
+            _equippedPetId = user.equippedPetId;
+          });
         }
       });
 
@@ -137,6 +141,7 @@ class _CollectionPageState extends State<CollectionPage> {
             ownedPets: _ownedPets,
             userId: widget.userId,
             userRepository: _userRepository,
+            equippedPetId: _equippedPetId,
             onPetEquipped: widget.onPetEquipped,
           );
         }).toList(),
@@ -161,6 +166,7 @@ Color _rarityColor(String rarity) {
 
 
 class _RaritySection extends StatelessWidget {
+  final String? equippedPetId;
   final String rarity;
   final List<PetModel> pets;
   final Map<String, UserPetProgress> ownedPets;
@@ -174,6 +180,7 @@ class _RaritySection extends StatelessWidget {
     required this.ownedPets,
     required this.userId,
     required this.userRepository,
+    this.equippedPetId,
     this.onPetEquipped,
   });
 
@@ -230,6 +237,7 @@ class _RaritySection extends StatelessWidget {
             final userPet = ownedPets[pet.id];
             final isOwned = userPet != null;
 
+
             return _PetCard(
               pet: pet,
               userPet: userPet,
@@ -238,6 +246,7 @@ class _RaritySection extends StatelessWidget {
               rarityBackColor: Colors.white,
               userId: userId,
               userRepository: userRepository,
+              equippedPetId: equippedPetId,
               onPetEquipped: onPetEquipped,
             );
           },
@@ -256,6 +265,7 @@ class _PetCard extends StatelessWidget {
   final Color rarityBackColor;
   final String userId;
   final UserRepository userRepository;
+  final String? equippedPetId;
   final VoidCallback? onPetEquipped;
 
   const _PetCard({
@@ -266,6 +276,7 @@ class _PetCard extends StatelessWidget {
     required this.rarityBackColor,
     required this.userId,
     required this.userRepository,
+    this.equippedPetId,
     this.onPetEquipped,
   });
 
@@ -282,6 +293,7 @@ class _PetCard extends StatelessWidget {
         rarityBackColor: rarityBackColor,
         userId: userId,
         userRepository: userRepository,
+        equippedPetId: equippedPetId,
         onPetEquipped: onPetEquipped,
       ),
     );
@@ -370,6 +382,7 @@ class _PetDetailSheet extends StatefulWidget {
   final Color rarityBackColor;
   final String userId;
   final UserRepository userRepository;
+  final String? equippedPetId;
   final VoidCallback? onPetEquipped;
 
   const _PetDetailSheet({
@@ -380,6 +393,7 @@ class _PetDetailSheet extends StatefulWidget {
     required this.rarityBackColor,
     required this.userId,
     required this.userRepository,
+    this.equippedPetId,
     this.onPetEquipped,
   });
 
@@ -667,7 +681,36 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                   const SizedBox(height: 28),
 
                   if (widget.isOwned)
-                    SizedBox(
+                    widget.equippedPetId == widget.pet.id
+                        ? Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: widget.rarityColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: widget.rarityColor.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle,
+                              size: 18,
+                              color: widget.rarityColor.withValues(alpha: 0.7)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Equipped',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: widget.rarityColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                        : SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: _isEquipping ? null : _equip,
@@ -694,6 +737,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+
                       ),
                     ),
                 ],

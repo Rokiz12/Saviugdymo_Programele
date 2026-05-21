@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import '../services/theme_notifier.dart';
+import '../theme/app_theme.dart';
 
 class MonthChartStrip extends StatefulWidget {
   final DateTime initialMonth;
   final ValueChanged<DateTime> onMonthChanged;
   final Map<DateTime, List<double>> dataByMonth;
 
+
+  final double maxHeightFraction;
+
+
+  final double verticalOffset;
+
   const MonthChartStrip({
     super.key,
     required this.initialMonth,
     required this.onMonthChanged,
     required this.dataByMonth,
+    this.maxHeightFraction = 0.9,
+    this.verticalOffset = -0.15,
   });
 
   @override
@@ -56,6 +66,7 @@ class _MonthChartStripState extends State<MonthChartStrip> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return SizedBox(
       height: 110,
       child: Stack(
@@ -67,6 +78,8 @@ class _MonthChartStripState extends State<MonthChartStrip> {
                 months: _months,
                 dataByMonth: widget.dataByMonth,
                 activePage: _page,
+                maxHeightFraction: widget.maxHeightFraction,
+                verticalOffset: widget.verticalOffset,
               ),
             ),
           ),
@@ -84,13 +97,15 @@ class _MonthChartStripState extends State<MonthChartStrip> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: active ? const Color(0xFFD4537E) : Colors.grey.shade200,
+                    color: active
+                        ? colors.intenseColor
+                        : colors.background2,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     _label(month),
                     style: TextStyle(
-                      color: active ? Colors.white : Colors.black87,
+                      color: colors.textColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -115,15 +130,24 @@ class _MonthChartPainter extends CustomPainter {
   final List<DateTime> months;
   final Map<DateTime, List<double>> dataByMonth;
   final double activePage;
+  final double maxHeightFraction;
+  final double verticalOffset;
 
   _MonthChartPainter({
     required this.months,
     required this.dataByMonth,
     required this.activePage,
+    required this.maxHeightFraction,
+    required this.verticalOffset,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // The chart is centred on the middle of the strip, then shifted by
+    // verticalOffset. halfSwing is the amplitude above/below that centre.
+    final double centre = size.height * (0.5 + verticalOffset);
+    final double halfSwing = size.height * maxHeightFraction * 0.5;
+
     // Gather all (x, y) points across all months
     final allPoints = <Offset>[];
 
@@ -141,7 +165,9 @@ class _MonthChartPainter extends CustomPainter {
         final amp = pow(rawValue.clamp(0.0, 1.0), 0.55).toDouble();
         final t = globalIndex / max(1, totalPoints - 1);
         final x = size.width * t;
-        final y = size.height * (1 - amp) * 0.85 + size.height * 0.05;
+        // amp == 1 → top of swing (centre - halfSwing)
+        // amp == 0 → bottom of swing (centre + halfSwing)
+        final y = centre + halfSwing * (1 - 2 * amp);
         allPoints.add(Offset(x, y));
         globalIndex++;
       }
@@ -179,7 +205,7 @@ class _MonthChartPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Dots — larger for active month's points
+    // Dots — only drawn for the active month
     final int activeMonthIdx = activePage.round().clamp(0, months.length - 1);
     int gi = 0;
     for (int mi = 0; mi < months.length; mi++) {
@@ -188,13 +214,12 @@ class _MonthChartPainter extends CustomPainter {
       if (values == null) continue;
       for (int vi = 0; vi < values.length; vi++) {
         final pt = allPoints[gi];
-        final isActive = mi == activeMonthIdx;
-        canvas.drawCircle(
-          pt,
-          isActive ? 5 : 3,
-          Paint()..color = const Color(0xFFD4537E).withOpacity(isActive ? 1.0 : 0.5),
-        );
-        if (isActive) {
+        if (mi == activeMonthIdx) {
+          canvas.drawCircle(
+            pt,
+            5,
+            Paint()..color = const Color(0xFFD4537E),
+          );
           canvas.drawCircle(
             pt,
             5,
@@ -211,5 +236,8 @@ class _MonthChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MonthChartPainter old) =>
-      old.activePage != activePage || old.dataByMonth != dataByMonth;
+      old.activePage != activePage ||
+          old.dataByMonth != dataByMonth ||
+          old.maxHeightFraction != maxHeightFraction ||
+          old.verticalOffset != verticalOffset;
 }

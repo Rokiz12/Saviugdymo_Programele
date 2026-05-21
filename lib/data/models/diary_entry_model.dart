@@ -11,6 +11,7 @@ class DiaryEntryModel {
   final String diaryText;
   final String preview;
   final String? imageUrl;
+  final String? category;
 
   // konstruktorius
   DiaryEntryModel({
@@ -23,6 +24,7 @@ class DiaryEntryModel {
     required this.diaryText,
     required this.preview,
     this.imageUrl,
+    this.category,
   });
 
   // Iš Firestore į Modelį
@@ -41,6 +43,7 @@ class DiaryEntryModel {
       diaryText: data['diaryText'] ?? '',
       preview: data['preview'] ?? '',
       imageUrl: data['imageUrl'],
+      category: data['category'],
     );
   }
 
@@ -55,6 +58,7 @@ class DiaryEntryModel {
       'diaryText': diaryText,
       'preview': preview,
       'imageUrl': imageUrl,
+      'category': category
     };
   }
 

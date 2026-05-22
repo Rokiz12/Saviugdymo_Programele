@@ -16,6 +16,7 @@ import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
 import 'services/fcm_service.dart';
 import 'services/theme_notifier.dart';
+import 'services/language_notifier.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -24,10 +25,11 @@ void main() async {
   preloadPetImages();
   runApp(
       MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => RewardNotifier()),
-          ChangeNotifierProvider(create: (_) => ThemeNotifier()),
-        ],
+          providers: [
+            ChangeNotifierProvider(create: (_) => RewardNotifier()),
+            ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+            ChangeNotifierProvider(create: (_) => LanguageNotifier()),
+          ],
         child: const MyApp(),
       )
   );
@@ -146,17 +148,19 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
+
     return Scaffold(
       body: TabBarView(controller: tabController, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: onItemTapped,
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Avataras"),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Statistikos"),
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.person), label: lang.t('nav_avatar')),
+          BottomNavigationBarItem(icon: const Icon(Icons.bar_chart), label: lang.t('nav_statistics')),
+          BottomNavigationBarItem(icon: const Icon(Icons.check_circle), label: lang.t('nav_habits')),
+          BottomNavigationBarItem(icon: const Icon(Icons.book), label: lang.t('nav_diary')),
         ],
       ),
     );

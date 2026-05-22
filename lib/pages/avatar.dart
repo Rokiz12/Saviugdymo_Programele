@@ -13,10 +13,10 @@ class AvatarPage extends StatefulWidget {
   const AvatarPage({super.key, required this.userId});
 
   @override
-  State<AvatarPage> createState() => _AvatarPageState();
+  State<AvatarPage> createState() => AvatarPageState();
 }
 
-class _AvatarPageState extends State<AvatarPage>
+class AvatarPageState extends State<AvatarPage>
     with SingleTickerProviderStateMixin {
   final UserRepository _userRepository = UserRepository();
   final PetRepository _petRepository = PetRepository();

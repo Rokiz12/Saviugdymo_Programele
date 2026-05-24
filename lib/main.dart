@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
 import 'pages/combined_avatar_and_collection.dart';
-import 'pages/diary.dart';
+import 'pages/diary/diary_page.dart';
 import 'pages/statistics.dart';
 import 'pages/habits.dart';
 import 'pages/settings.dart';

@@ -49,7 +49,8 @@ class DiaryProvider extends ChangeNotifier {
   Set<String> selectedForDeletion = {};
 
   final List<String> moods = ['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
-  final List<String> moodEmojis = ['😀', '🙂', '😐', '😢', '😭'];
+
+
 
   DiaryProvider() {
     userId = FirebaseAuth.instance.currentUser!.uid;
@@ -231,7 +232,7 @@ class DiaryProvider extends ChangeNotifier {
   bool get canAddPhoto => isPremium || photosThisWeek < 3;
 
   // Išsaugojimas
-  Future<(bool, int, int)> saveEntry() async {
+  Future<(bool, int, int)> saveEntry(String moodImagePath) async {
     final now = DateTime.now();
     final id = '${now.millisecondsSinceEpoch}';
     String? uploadedImageUrl;
@@ -255,7 +256,6 @@ class DiaryProvider extends ChangeNotifier {
       DiaryEntryModel(
         id: id,
         createdAt: now,
-        mood: '${moodEmojis[moods.indexOf(selectedMood)]} $selectedMood',
         highlight: textControllers[0].text,
         better: textControllers[1].text,
         gratitude: textControllers[2].text,
@@ -263,6 +263,8 @@ class DiaryProvider extends ChangeNotifier {
         preview: preview.length > 50 ? '${preview.substring(0, 47)}...' : preview,
         imageUrl: uploadedImageUrl,
         category: finalCategory,
+        moodImage: moodImagePath,
+        mood: selectedMood,
       ),
     );
 
@@ -291,7 +293,8 @@ class DiaryProvider extends ChangeNotifier {
       final updatedEntry = DiaryEntryModel(
         id: entry.id, createdAt: entry.createdAt, mood: entry.mood, highlight: entry.highlight,
         better: entry.better, gratitude: entry.gratitude, diaryText: entry.diaryText,
-        preview: entry.preview, imageUrl: null, category: entry.category,
+        preview: entry.preview, imageUrl: null, category: entry.category,   moodImage: entry.moodImage,
+
       );
       await _repository.addEntry(userId, updatedEntry);
     }

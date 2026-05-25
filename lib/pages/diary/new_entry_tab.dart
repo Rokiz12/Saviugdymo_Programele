@@ -21,6 +21,8 @@ class NewEntryTab extends StatelessWidget {
       return;
     }
 
+    final moodImagePath = context.colors.moodImages[provider.moods.indexOf(provider.selectedMood)];
+
     if (provider.moods.indexOf(provider.selectedMood) <= 1) {
       SoundService.playHappyDiary();
     } else {
@@ -34,7 +36,7 @@ class NewEntryTab extends StatelessWidget {
     );
 
     try {
-      final (gotXp, oldLvl, newLvl) = await provider.saveEntry();
+      final (gotXp, oldLvl, newLvl) = await provider.saveEntry(moodImagePath);
       if (!context.mounted) return;
       Navigator.pop(context); // close loading
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Įrašas išsaugotas!"), backgroundColor: Colors.green));
@@ -187,17 +189,26 @@ class NewEntryTab extends StatelessWidget {
       onTap: () => provider.setMood(provider.moods[i]),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected ? colors.intenseColor : colors.background2,
-              borderRadius: BorderRadius.circular(16),
-              border: isSelected ? Border.all(color: colors.textColor.withOpacity(0.2), width: 1) : Border.all(color: colors.background, width: 1.5),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            transform: isSelected
+                ? (Matrix4.identity()..translate(0.0, -12.0))
+                : Matrix4.identity(),
+            child: Image.asset(
+              colors.moodImages[i],
+              width: 60,
+              height: 60,
             ),
-            child: Text(provider.moodEmojis[i], style: const TextStyle(fontSize: 28)),
           ),
           const SizedBox(height: 6),
-          Text(provider.moods[i], style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: colors.textColor)),
+          Text(
+            provider.moods[i],
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: colors.textColor,
+            ),
+          ),
         ],
       ),
     );

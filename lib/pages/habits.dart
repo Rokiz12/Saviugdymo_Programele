@@ -14,7 +14,6 @@ import '../data/repositories/user_repository.dart';
 import '../services/reward_notifier.dart';
 import '../services/reward_service.dart';
 import '../widgets/reusables.dart';
-import '../services/theme_notifier.dart';
 import '../theme/app_theme.dart';
 
 

@@ -10,6 +10,8 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color intenseColor; // tik lygio spalva
   final Color appBarUnpickedColor; // secondary text
   final Color textColor;
+  final List<String> moodImages;
+  final String logo;
 
 
   const AppColors({
@@ -19,8 +21,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.intenseColor,
     required this.appBarUnpickedColor,
     required this.textColor,
-
-
+    required this.moodImages,
+    required this.logo,
   });
 
 
@@ -31,6 +33,12 @@ class AppColors extends ThemeExtension<AppColors> {
     intenseColor: Color(0xFFFFC963),
     appBarUnpickedColor: Color(0xFF999999),
     textColor: Color(0xFF000000),
+    moodImages: ['assets/ui/emojis/light_mood_happy.png',
+      'assets/ui/emojis/light_mood_okay.png',
+      'assets/ui/emojis/light_mood_neutral.png',
+      'assets/ui/emojis/light_mood_eh.png',
+      'assets/ui/emojis/light_mood_bad.png'],
+    logo: 'assets/ui/emojis/light_logo.png',
 
   );
 
@@ -41,6 +49,13 @@ class AppColors extends ThemeExtension<AppColors> {
     intenseColor: Color(0xFF5848EA),
     appBarUnpickedColor: Color(0xFFD4D4D4),
     textColor: Color(0xFFF6F5F5),
+    moodImages: ['assets/ui/emojis/light_mood_happy.png',
+      'assets/ui/emojis/light_mood_okay.png',
+      'assets/ui/emojis/light_mood_neutral.png',
+      'assets/ui/emojis/light_mood_eh.png',
+      'assets/ui/emojis/light_mood_bad.png'],
+    logo: 'assets/ui/emojis/dark_logo.png',
+
 
   );
 
@@ -58,6 +73,8 @@ class AppColors extends ThemeExtension<AppColors> {
       intenseColor: levelColor ?? this.intenseColor,
       appBarUnpickedColor: appBarUnpickedColor ?? this.appBarUnpickedColor,
       textColor: textColor ?? this.textColor,
+      moodImages: moodImages,
+      logo: logo,
     );
   }
 

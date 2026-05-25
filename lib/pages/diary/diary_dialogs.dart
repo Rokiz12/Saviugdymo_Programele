@@ -195,7 +195,18 @@ class DiaryDialogs {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: colors.primary, borderRadius: BorderRadius.circular(8)), child: Text(e.mood, style: TextStyle(color: colors.textColor))),
+              Row(
+                children: [
+                  if (e.moodImage != null && e.moodImage!.isNotEmpty)
+                    Image.asset(e.moodImage!, width: 32, height: 32),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: colors.primary, borderRadius: BorderRadius.circular(8)),
+                    child: Text(e.mood, style: TextStyle(color: colors.textColor)),
+                  ),
+                ],
+              ),
               if (e.highlight.isNotEmpty) ...[const SizedBox(height: 12), Text("✨ ${e.highlight}", style: TextStyle(color: colors.textColor))],
               if (e.diaryText.isNotEmpty) ...[const SizedBox(height: 12), Text("📖 ${e.diaryText}", style: TextStyle(color: colors.textColor))],
               if (e.imageUrl != null && e.imageUrl!.isNotEmpty) ...[
@@ -230,8 +241,9 @@ class DiaryDialogs {
             Text(dateStr, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.textColor)),
             const SizedBox(height: 16),
             ...entries.map((e) => ListTile(
-              leading: Text(e.mood.split(' ')[0], style: const TextStyle(fontSize: 24)),
-              title: Text('${e.createdAt.hour}:${e.createdAt.minute.toString().padLeft(2, '0')}', style: TextStyle(color: colors.textColor)),
+              leading: e.moodImage != null && e.moodImage!.isNotEmpty
+                  ? Image.asset(e.moodImage!, width: 32, height: 32)
+                  : Text(e.mood.split(' ')[0], style: const TextStyle(fontSize: 24)),              title: Text('${e.createdAt.hour}:${e.createdAt.minute.toString().padLeft(2, '0')}', style: TextStyle(color: colors.textColor)),
               subtitle: Text(e.preview, maxLines: 1, style: TextStyle(color: colors.appBarUnpickedColor)),
               onTap: () { Navigator.pop(context); showEntryDialog(context, e); },
             )),

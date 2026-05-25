@@ -13,10 +13,11 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final themeNotifier = context.read<ThemeNotifier>();
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: colors.background,
       appBar: const CustomAppBar(title: "Nustatymai"),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -34,9 +35,9 @@ class SettingsPage extends StatelessWidget {
               ),
               _SettingsTile(
                 icon: Icons.email,
-                iconColor: Colors.blue,
+                iconColor: colors.intenseColor,
                 title: "El. paštas",
-                subtitle: FirebaseAuth.instance.currentUser?.email,
+                subtitle: FirebaseAuth.instance.currentUser?.email ?? "Nėra el. pašto",
                 onTap: () {},
               ),
             ],
@@ -86,13 +87,13 @@ class SettingsPage extends StatelessWidget {
             children: [
               _SettingsTile(
                 icon: Icons.star,
-                iconColor: Colors.amber,
+                iconColor: colors.primary,
                 title: "Premium",
                 subtitle: "Neaktyvi",
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.yellow,
+                    color: colors.primary,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: const Text(
@@ -105,7 +106,7 @@ class SettingsPage extends StatelessWidget {
             ],
           ),
 
-          // LOGOUT
+          // PASKYRA
           _SettingsCard(
             title: "Paskyra",
             children: [
@@ -129,8 +130,6 @@ class SettingsPage extends StatelessWidget {
                 title: "Atsijungti",
                 onTap: () async {
                   await AuthService.signOut();
-
-                  // optional redirect
                   Navigator.pushReplacementNamed(context, '/login');
                 },
               ),
@@ -168,8 +167,6 @@ class SettingsPage extends StatelessWidget {
                     await FirebaseAuth.instance.currentUser?.delete();
                     Navigator.pushReplacementNamed(context, '/login');
                   } on FirebaseAuthException catch (e) {
-                    // If the user hasn't logged in recently Firebase will throw
-                    // requires-recent-login — handle it gracefully
                     if (e.code == 'requires-recent-login') {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -190,7 +187,7 @@ class SettingsPage extends StatelessWidget {
           Center(
             child: Text(
               'Version 1.0.0',
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              style: TextStyle(color: colors.textColor, fontSize: 12),
             ),
           ),
 
@@ -215,31 +212,22 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title OUTSIDE the card box
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Row(
               children: [
                 Container(
                   width: 4,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: Colors.yellow[700],
+                    color: colors.primary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -249,13 +237,28 @@ class _SettingsCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+                    color: colors.textColor,
                   ),
                 ),
               ],
             ),
           ),
-          ...children,
+          // Card box BELOW the title
+          ...children.map((child) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: colors.background2,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: child,
+            )).toList(),
         ],
       ),
     );
@@ -282,6 +285,7 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -307,9 +311,10 @@ class _SettingsTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
+                        color: colors.textColor,
                       ),
                     ),
                     if (subtitle != null) ...[
@@ -318,7 +323,7 @@ class _SettingsTile extends StatelessWidget {
                         subtitle!,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[600],
+                          color: colors.textColor.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -327,7 +332,7 @@ class _SettingsTile extends StatelessWidget {
               ),
               if (trailing != null) trailing!,
               if (trailing == null)
-                Icon(Icons.chevron_right, color: Colors.grey[400]),
+                Icon(Icons.chevron_right, color: colors.primary),
             ],
           ),
         ),
@@ -352,6 +357,7 @@ class _SettingsRadioTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -365,18 +371,19 @@ class _SettingsRadioTile extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: colors.background,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: Colors.grey[600], size: 24),
+                child: Icon(icon, color: colors.primary, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
+                    color: colors.textColor,
                   ),
                 ),
               ),

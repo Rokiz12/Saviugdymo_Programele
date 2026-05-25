@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/sound_service.dart';
+import '../theme/app_theme.dart';
 
 class CollectionPage extends StatefulWidget {
   final String userId;
@@ -288,6 +289,7 @@ class _PetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final duplicateCount = userPet?.duplicateCount ?? 0;
 
     final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
@@ -300,7 +302,7 @@ class _PetCard extends StatelessWidget {
       onTap: () => _openPopup(context),
       child: Container(
         decoration: BoxDecoration(
-          color: isOwned ? Colors.white : Colors.grey.shade100,
+          color: isOwned ? colors.background2 : Colors.grey.shade100,
           border: Border.all(
             color: isOwned ? rarityColor : Colors.grey.shade300,
             width: isOwned ? 2 : 1,
@@ -333,10 +335,10 @@ class _PetCard extends StatelessWidget {
                         errorWidget: (context, url, error) =>
                             Icon(Icons.pets,
                                 size: 40,
-                                color: Colors.grey.shade400),
+                                color: colors.background2),
                       )
                       : Icon(Icons.pets,
-                      size: 40, color: Colors.grey.shade400),
+                      size: 40, color: colors.background2),
                 ),
               ),
               if (!isOwned)

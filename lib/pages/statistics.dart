@@ -9,6 +9,7 @@ import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 import '../widgets/best_month_card.dart';
 import '../theme/app_theme.dart';
+import '../widgets/custom_app_bar.dart';
 
 
 class _MonthStats {
@@ -297,6 +298,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
 
     if (_loading) {
       return const Scaffold(
@@ -312,15 +314,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            "Statistika",
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-          backgroundColor: Colors.yellow,
-          centerTitle: true,
-          bottom: const TabBar(
-            tabs: [
+        appBar: CustomAppBar(
+          title: 'Statistika',
+          bottom: TabBar(
+            indicatorColor: colors.intenseColor,
+            labelColor: colors.textColor,
+            unselectedLabelColor: colors.appBarUnpickedColor,
+            tabs: const [
               Tab(icon: Icon(Icons.check_circle), text: "Įpročiai"),
               Tab(icon: Icon(Icons.mood), text: "Nuotaika"),
             ],

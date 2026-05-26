@@ -107,12 +107,12 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: colors.background2,
-        selectedItemColor: colors.primary,
+        selectedItemColor: colors.intenseColor,
         unselectedItemColor: colors.appBarUnpickedColor,
       ),
       colorScheme: ColorScheme(
         brightness: brightness,
-        primary: colors.primary,
+        primary: colors.intenseColor,
         onPrimary: Colors.black,
         secondary: colors.primary,
         onSecondary: Colors.black,

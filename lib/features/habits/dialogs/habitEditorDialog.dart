@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../../../theme/app_theme.dart';
 
 class HabitEditorDialog extends StatefulWidget {
   final Habit? initial;
@@ -48,6 +49,7 @@ class _IconPickerFieldState extends State<IconPickerField> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -66,10 +68,10 @@ class _IconPickerFieldState extends State<IconPickerField> {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.yellow : Colors.grey.shade100,
+                  color: isSelected ? colors.primary : colors.background2,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSelected ? Colors.yellow.shade700 : Colors.grey.shade300,
+                    color: isSelected ? colors.primary : colors.background2,
                     width: isSelected ? 2 : 1,
                   ),
                 ),
@@ -122,9 +124,11 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final editing = widget.initial != null;
 
     return AlertDialog(
+
       title: Text(editing ? "Redaguoti įprotį" : "Naujas įprotis"),
       content: SingleChildScrollView(
         child: Column(
@@ -201,9 +205,9 @@ class _HabitEditorDialogState extends State<HabitEditorDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 "Pažymės kaip atliktą automatiškai, kai pasieksite tikslą.",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color : colors.textColor),
               ),
             ],
           ],

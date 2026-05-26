@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
-
+import '../../../theme/app_theme.dart';
 
 final _customDaysCtrl = TextEditingController();
 bool _repeat = false;
@@ -53,6 +53,7 @@ class _GoalEditorDialogState extends State<GoalEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final editing = widget.initial != null;
 
     return AlertDialog(
@@ -128,7 +129,7 @@ class _GoalEditorDialogState extends State<GoalEditorDialog> {
       ),
 
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Atšaukti")),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text("Atšaukti", style: TextStyle(color: colors.intenseColor))),
 
         TextButton(
           onPressed: () {
@@ -156,7 +157,7 @@ class _GoalEditorDialogState extends State<GoalEditorDialog> {
 
             Navigator.pop(context, goal);
           },
-          child: Text(editing ? "Išsaugoti" : "Pridėti"),
+          child: Text(editing ? "Išsaugoti" : "Pridėti", style: TextStyle(color: colors.intenseColor)),
         )
       ],
     );

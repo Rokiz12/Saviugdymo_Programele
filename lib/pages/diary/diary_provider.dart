@@ -86,7 +86,7 @@ class DiaryProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadUserPremiumStatus() async {
+  Future<void> _loadUserPremiumStatus() async { // ----premium checker
     final user = await UserRepository().getUser(userId);
     if (user != null) {
       isPremium = user.premium;

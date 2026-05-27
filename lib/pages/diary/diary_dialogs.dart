@@ -68,6 +68,42 @@ class DiaryDialogs {
 
   static void showAddCategoryDialog(BuildContext context, DiaryProvider provider) {
     final colors = context.colors;
+
+    // Premium gate: max 1 category for free users
+    if (!provider.isPremium && provider.categories.length >= 1) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: colors.background2,
+          title: Text("⭐ Premium funkcija", style: TextStyle(color: colors.textColor)),
+          content: Text(
+            "Nemokama versija leidžia turėti tik 1 kategoriją. Gauk Premium ir turėk neribotai!",
+            style: TextStyle(color: colors.appBarUnpickedColor),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Atšaukti", style: TextStyle(color: colors.textColor)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // TODO: navigate to paywall
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.intenseColor,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text("Gauti Premium"),
+            ),
+          ],
+        ),
+      );
+      return; // ← stop here, don't show add dialog
+    }
+
+    // Free user with 0 categories OR premium user — show normal dialog
     final TextEditingController catController = TextEditingController();
     showDialog(
       context: context,

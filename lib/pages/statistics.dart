@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../data/repositories/user_repository.dart';
 import '../features/habits/data/HabitRepository.dart';
 import '../features/habits/models/models.dart';
 import '../widgets/month_chart_strip.dart';
@@ -33,6 +34,7 @@ class _MonthStats {
 class StatisticsPage extends StatefulWidget {
   final String userId;
 
+
   const StatisticsPage({
     super.key,
     required this.userId,
@@ -40,9 +42,13 @@ class StatisticsPage extends StatefulWidget {
 
   @override
   State<StatisticsPage> createState() => _StatisticsPageState();
+
 }
 
 class _StatisticsPageState extends State<StatisticsPage> {
+
+  bool _isPremium = false;
+
 
   _MonthStats? _computeBestMonth() {
     if (_habits.isEmpty) return null;
@@ -170,7 +176,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
         viewEnd,
       );
 
+      final user = await UserRepository().getUser(widget.userId);
+
       setState(() {
+        _isPremium = user?.premium ?? false;
         _habits = habits;
         _logsByDay = map;
         _diaryEntries = allDiaryEntries;
@@ -458,8 +467,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           const SizedBox(height: 32),
 
-          _PremiumBanner(),
-          const SizedBox(height: 24),
+          if (!_isPremium)
+            _PremiumBanner(),
+            const SizedBox(height: 24),
+
 
           if (best != null)
             BestMonthCard(

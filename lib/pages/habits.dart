@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:pvp/features/habits/data/HabitRepository.dart';
 import 'package:pvp/features/habits/data/foreground_time_tracker.dart';
 import 'package:pvp/features/habits/models/models.dart';
@@ -10,9 +9,6 @@ import 'package:pvp/services/step_service.dart';
 import '../services/sound_service.dart';
 import '../features/habits/utils/habitIcons.dart';
 import '../widgets/custom_app_bar.dart';
-import '../data/repositories/user_repository.dart';
-import '../services/reward_notifier.dart';
-import '../services/reward_service.dart';
 import '../widgets/reusables.dart';
 import '../theme/app_theme.dart';
 
@@ -50,7 +46,6 @@ class _HabitsPageState extends State<HabitsPage> {
   Future<void> _initialize() async {
     await _loadInitial();
     await _ensureAutoHabitExists();
-    _startTracker();
     await _syncStepHabits(); // ← on-launch step check
   }
 
@@ -371,63 +366,6 @@ class _HabitsPageState extends State<HabitsPage> {
       await _repo.addHabit(userId: widget.userId, habit: auto);
       setState(() => _habits.add(auto));
     }
-  }
-
-  void _startTracker() {
-    _tracker = ForegroundTimeTracker(
-      threshold: const Duration(minutes: 2),
-      onReached: (day) async {
-        DayLog log = _today ?? DayLog(dateUtc: day, entries: {});
-
-        if (log.dateUtc.year  != day.year ||
-            log.dateUtc.month != day.month ||
-            log.dateUtc.day   != day.day) {
-          log = DayLog(dateUtc: day, entries: {});
-        }
-
-        final alreadyCompleted = (log.entries['app2min'] as Map?)?['v'] == true;
-
-        if (alreadyCompleted) return;
-
-        // mark completed
-        log = log.setValue('app2min', const BoolValue(true));
-        // save log
-        await _repo.upsertDayLog(
-          userId: widget.userId,
-          log: log,
-        );
-
-
-        // give XP ONCE
-        final userRepo = UserRepository();
-        final (
-        oldLevel: oldLevel,
-        newLevel: newLevel,
-        ) = await userRepo.addUserXp(widget.userId, 20);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Gavai +20 XP!", style: TextStyle(fontWeight: FontWeight.bold))),
-          );
-        }
-        final rewardNotifier = context.read<RewardNotifier>();
-
-        await RewardService().checkLevelUp(
-          userId: widget.userId,
-          oldLevel: oldLevel,
-          newLevel: newLevel,
-          notifier: rewardNotifier,
-        );
-
-
-        final now = DateTime.now().toUtc();
-
-        if (day.year == now.year &&
-            day.month == now.month &&
-            day.day == now.day) {
-          setState(() => _today = log);
-        }
-      },
-    )..start();
   }
 
   @override

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:pvp/features/habits/data/foreground_time_tracker.dart';
 
+import 'features/habits/data/HabitRepository.dart';
+import 'features/habits/models/dayLog.dart';
+import 'features/habits/models/ratingValue.dart';
 import 'pages/combined_avatar_and_collection.dart';
 import 'pages/diary/diary_page.dart';
 import 'pages/statistics.dart';
@@ -80,6 +84,8 @@ class _MainScreenState extends State<MainScreen>
   late TabController tabController;
   late List<Widget> pages;
 
+  ForegroundTimeTracker? _tracker;
+
   @override
   void initState() {
     super.initState();
@@ -105,7 +111,57 @@ class _MainScreenState extends State<MainScreen>
       _rewardNotifier.addListener(_onRewardChanged);
       _checkDailyReward();
     });
+
+    _startTracker();
   }
+
+  void _startTracker() {
+    _tracker = ForegroundTimeTracker(
+      threshold: const Duration(minutes: 2),
+      onReached: (day) async {
+        final repo = FirebaseDayLogRepository();
+
+        // Load today's log
+        final now = DateTime.now().toUtc();
+        final logDay = DateTime.utc(now.year, now.month, now.day);
+        final logs = await repo.getLogsForRange(
+          userId: widget.userId,
+          startInclusive: logDay,
+          endInclusive: logDay,
+        );
+
+        DayLog log = logs.isNotEmpty
+            ? logs.first
+            : DayLog(dateUtc: logDay, entries: {});
+
+        final alreadyCompleted = (log.entries['app2min'] as Map?)?['v'] == true;
+        if (alreadyCompleted) return;
+
+        // Mark completed & save
+        log = log.setValue('app2min', const BoolValue(true));
+        await repo.upsertDayLog(userId: widget.userId, log: log);
+
+        // Give XP
+        final userRepo = UserRepository();
+        final (:oldLevel, :newLevel) = await userRepo.addUserXp(widget.userId, 20);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Gavai +20 XP!", style: TextStyle(fontWeight: FontWeight.bold))),
+          );
+        }
+
+        final rewardNotifier = context.read<RewardNotifier>();
+        await RewardService().checkLevelUp(
+          userId: widget.userId,
+          oldLevel: oldLevel,
+          newLevel: newLevel,
+          notifier: rewardNotifier,
+        );
+      },
+    )..start();
+  }
+
 
   Future<void> _checkDailyReward() async {
     final user = await UserRepository().getUser(widget.userId);

@@ -9,6 +9,8 @@ import '../data/repositories/diary_repository.dart';
 import '../data/models/diary_entry_model.dart';
 import '../widgets/best_month_card.dart';
 import '../theme/app_theme.dart';
+import '../services/language_notifier.dart';
+import 'package:provider/provider.dart';
 
 
 class _MonthStats {
@@ -297,7 +299,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
-
+    final lang = context.watch<LanguageNotifier>();
     if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -313,16 +315,16 @@ class _StatisticsPageState extends State<StatisticsPage> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            "Statistika",
+          title: Text(
+            lang.t('statistics'),
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
           ),
           backgroundColor: Colors.yellow,
           centerTitle: true,
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.check_circle), text: "Įpročiai"),
-              Tab(icon: Icon(Icons.mood), text: "Nuotaika"),
+              Tab(icon: Icon(Icons.check_circle), text: lang.t('habits')),
+              Tab(icon: Icon(Icons.mood), text: lang.t('mood')),
             ],
           ),
         ),
@@ -339,7 +341,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
   Widget _buildHabitsTab(DateTime firstDayOfMonth, int daysInMonth,
       int firstWeekday, int totalCells) {
     final colors = context.colors;
-
+    final lang = context.watch<LanguageNotifier>();
     final best = _computeBestMonth();
 
     // Stats across the historical window (excluding current month)
@@ -414,9 +416,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
-              children: const [
-                _Weekday("Pr"), _Weekday("An"), _Weekday("Tr"),
-                _Weekday("Kt"), _Weekday("Pn"), _Weekday("Št"), _Weekday("Sk"),
+              children:  [
+                _Weekday(lang.t('mon_short')),
+                _Weekday(lang.t('tue_short')),
+                _Weekday(lang.t('wed_short')),
+                _Weekday(lang.t('thu_short')),
+                _Weekday(lang.t('fri_short')),
+                _Weekday(lang.t('sat_short')),
+                _Weekday(lang.t('sun_short')),
               ],
             ),
           ),
@@ -481,6 +488,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 
   Widget _buildMoodTab() {
+    final lang = context.watch<LanguageNotifier>();
     final spots = _buildMoodChartData();
     if (spots.isEmpty || spots.every((spot) => spot.y == 0)) {
       return Center(
@@ -489,7 +497,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
           children: [
             const Icon(Icons.mood_bad, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text("Nėra šio mėnesio nuotaikos duomenų", style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(
+              lang.t('no_mood_data'),
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -524,7 +535,13 @@ class _StatisticsPageState extends State<StatisticsPage> {
                       getTitlesWidget: (value, meta) => value.toInt() % 5 == 0 ? Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)) : const SizedBox.shrink())),
                   leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 80,
                       getTitlesWidget: (value, meta) {
-                        const moods = ['😭 Blogai', '😢 Prastai', '😐 Normaliai', '🙂 Gerai', '😀 Puikiai'];
+                        final moods = [
+                          lang.t('mood_bad'),
+                          lang.t('mood_poor'),
+                          lang.t('mood_normal'),
+                          lang.t('mood_good'),
+                          lang.t('mood_great'),
+                        ];
                         final index = value.toInt() - 1;
                         return (index >= 0 && index < moods.length) ? Text(moods[index], style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis) : const SizedBox.shrink();
                       })),
@@ -562,6 +579,7 @@ class _PremiumBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
     final colors = context.colors;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -592,7 +610,7 @@ class _PremiumBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Neriboti įrašai, nuotraukos ir išsami statistika.',
+                  lang.t('premium_desc'),
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
@@ -609,8 +627,8 @@ class _PremiumBanner extends StatelessWidget {
                 color: colors.intenseColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text(
-                'Gauti',
+              child: Text(
+                lang.t('get'),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,

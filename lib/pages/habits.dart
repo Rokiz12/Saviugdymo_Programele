@@ -16,7 +16,7 @@ import '../services/reward_service.dart';
 import '../widgets/reusables.dart';
 import '../services/theme_notifier.dart';
 import '../theme/app_theme.dart';
-
+import '../services/language_notifier.dart';
 
 
 class HabitsPage extends StatefulWidget {
@@ -467,6 +467,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
 
     if (_today == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -512,12 +513,13 @@ class _HabitsPageState extends State<HabitsPage> {
 // ─── HABITS SECTION ──────────────────────────────────────────────────────────
 
   Widget _buildHabitsSection() {
+    final lang = context.watch<LanguageNotifier>();
     final colors = context.colors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader("Tavo įpročiai"),
+        SectionHeader(lang.t("your_habits")),
         const SizedBox(height: 10),
 
         ..._habits.map((h) {
@@ -571,12 +573,13 @@ class _HabitsPageState extends State<HabitsPage> {
 // ─── GOALS SECTION ───────────────────────────────────────────────────────────
 
   Widget _buildGoalsSection() {
+    final lang = context.watch<LanguageNotifier>();
     final colors = context.colors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader("Tavo tikslai"),
+        SectionHeader(lang.t("your_goals")),
         const SizedBox(height: 10),
 
         if (_goals.isEmpty)
@@ -722,10 +725,10 @@ class _HabitsPageState extends State<HabitsPage> {
       case RatingKind.enumerator:
         final options  = h.options ?? const ["A", "B", "C"];
         final selected = (v is EnumValue) ? v.option : null;
-
+        final lang = context.watch<LanguageNotifier>();
         return DropdownButton<String>(
           value: options.contains(selected) ? selected : null,
-          hint: const Text("Pasirinkti"),
+          hint: Text(lang.t("select_hint")),
           items: options
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
               .toList(),

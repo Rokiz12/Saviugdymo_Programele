@@ -1,12 +1,15 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import "package:cached_network_image/cached_network_image.dart";
+
 import '../data/models/user_model.dart';
 import '../data/models/pet_model.dart';
 import '../data/repositories/user_repository.dart';
 import '../data/repositories/pet_repository.dart';
-import "package:cached_network_image/cached_network_image.dart";
 import '../data/repositories/quote_repository.dart';
 import '../theme/app_theme.dart';
+import '../services/language_notifier.dart';
 
 class AvatarPage extends StatefulWidget {
   final String userId;
@@ -28,7 +31,6 @@ class AvatarPageState extends State<AvatarPage>
 
   late Future<(UserModel?, PetModel?)> _dataFuture;
 
-  // speech bubble state
   List<String> _quotes = [];
   String _currentQuote = '';
   bool _bubbleVisible = false;
@@ -41,11 +43,16 @@ class AvatarPageState extends State<AvatarPage>
     _floatingController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
-    )
-      ..repeat(reverse: true);
+    )..repeat(reverse: true);
 
-    _floatingAnimation = Tween<double>(begin: -3.0, end: 3.0).animate(
-      CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
+    _floatingAnimation = Tween<double>(
+      begin: -3.0,
+      end: 3.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _floatingController,
+        curve: Curves.easeInOut,
+      ),
     );
 
     _dataFuture = _fetchData();
@@ -57,6 +64,7 @@ class AvatarPageState extends State<AvatarPage>
     if (user == null) return (null, null);
 
     PetModel? pet;
+
     if (user.equippedPetId.isNotEmpty) {
       pet = await _petRepository.getPet(user.equippedPetId);
     }
@@ -66,6 +74,7 @@ class AvatarPageState extends State<AvatarPage>
 
   Future<void> _loadQuotes() async {
     final quotes = await _quoteRepository.getQuotes();
+
     if (mounted) {
       setState(() {
         _quotes = quotes;
@@ -77,8 +86,8 @@ class AvatarPageState extends State<AvatarPage>
   void _onAvatarTap(String petName) {
     if (!_quotesLoaded || _quotes.isEmpty) return;
 
-    // pick random quote
     String newQuote = _currentQuote;
+
     if (_quotes.length > 1) {
       while (newQuote == _currentQuote) {
         newQuote = _quotes[Random().nextInt(_quotes.length)];
@@ -114,29 +123,45 @@ class AvatarPageState extends State<AvatarPage>
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     return FutureBuilder<(UserModel?, PetModel?)>(
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
         }
 
         final (user, pet) = snapshot.data ?? (null, null);
+
         if (user == null) {
-          return const Center(child: Text("User not found"));
+          return Center(
+            child: Text(lang.t('user_not_found')),
+          );
         }
 
         final petProgress = user.ownedPets[user.equippedPetId];
         final userXp = user.xp;
         final userLevel = user.level;
+
         const nextLevelXp = 100;
-        final petName = pet?.name ?? "No Pet";
-        final petRarity = pet?.rarity ?? "Common";
+
+        final petName = pet?.name ?? lang.t('no_pet');
+        final petRarity = pet?.rarity ?? lang.t('common');
+
         final duplicateCount = petProgress?.duplicateCount ?? 0;
-        final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
-        final imageUrl = pet?.images[imageKey] ??
-            pet?.images.values.firstOrNull ?? '';
+
+        final imageKey = duplicateCount >= 10
+            ? 'Skin'
+            : 'collection';
+
+        final imageUrl =
+            pet?.images[imageKey] ??
+                pet?.images.values.firstOrNull ??
+                '';
+
         final streak = user.streak;
 
         return SingleChildScrollView(
@@ -145,23 +170,29 @@ class AvatarPageState extends State<AvatarPage>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
 
-              // ── Pet image card ──────────────────────────────────────
+              // ── PET CARD ───────────────────────────────────────────
+
               Container(
                 decoration: BoxDecoration(
                   color: colors.background2,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 padding: const EdgeInsets.symmetric(
-                    vertical: 24, horizontal: 20),
+                  vertical: 24,
+                  horizontal: 20,
+                ),
                 child: Column(
                   children: [
+
                     // Speech bubble
+
                     AnimatedOpacity(
                       opacity: _bubbleVisible ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 200),
                       child: AnimatedSlide(
-                        offset: _bubbleVisible ? Offset.zero : const Offset(
-                            0, 0.08),
+                        offset: _bubbleVisible
+                            ? Offset.zero
+                            : const Offset(0, 0.08),
                         duration: const Duration(milliseconds: 200),
                         curve: Curves.easeOut,
                         child: IgnorePointer(
@@ -169,7 +200,9 @@ class AvatarPageState extends State<AvatarPage>
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 46, vertical: 22),
+                              horizontal: 46,
+                              vertical: 22,
+                            ),
                             decoration: BoxDecoration(
                               color: colors.primary,
                               borderRadius: BorderRadius.circular(14),
@@ -188,43 +221,60 @@ class AvatarPageState extends State<AvatarPage>
                       ),
                     ),
 
-                    // Pet image
+                    // Avatar image
+
                     AnimatedBuilder(
                       animation: _floatingAnimation,
-                      builder: (context, child) =>
-                          Transform.translate(
-                            offset: Offset(0, _floatingAnimation.value),
-                            child: child,
-                          ),
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(0, _floatingAnimation.value),
+                          child: child,
+                        );
+                      },
                       child: AnimatedScale(
                         scale: _avatarScale,
                         duration: const Duration(milliseconds: 150),
                         curve: Curves.easeOutCubic,
                         child: GestureDetector(
-                          onTapDown: (_) => setState(() => _avatarScale = 0.92),
+                          onTapDown: (_) {
+                            setState(() => _avatarScale = 0.92);
+                          },
                           onTapUp: (_) {
                             setState(() => _avatarScale = 1.0);
-                            _bubbleVisible ? _dismissBubble() : _onAvatarTap(
-                                petName);
+
+                            _bubbleVisible
+                                ? _dismissBubble()
+                                : _onAvatarTap(petName);
                           },
-                          onTapCancel: () => setState(() => _avatarScale = 1.0),
+                          onTapCancel: () {
+                            setState(() => _avatarScale = 1.0);
+                          },
                           child: SizedBox(
                             width: 180,
                             height: 180,
                             child: imageUrl.isEmpty
-                                ? const Icon(Icons.pets, size: 100)
+                                ? const Icon(
+                              Icons.pets,
+                              size: 100,
+                            )
                                 : CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.contain,
                               memCacheWidth: 512,
                               memCacheHeight: 512,
-                              placeholder: (_, __) =>
-                              const Center(
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2),
-                              ),
-                              errorWidget: (_, __, ___) =>
-                              const Icon(Icons.pets, size: 100),
+                              placeholder: (_, __) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              },
+                              errorWidget: (_, __, ___) {
+                                return const Icon(
+                                  Icons.pets,
+                                  size: 100,
+                                );
+                              },
                             ),
                           ),
                         ),
@@ -232,10 +282,11 @@ class AvatarPageState extends State<AvatarPage>
                     ),
 
                     const SizedBox(height: 8),
+
                     Text(
                       _bubbleVisible
-                          ? 'Paspausk, kad paslėptum'
-                          : 'Paspausk motyvacijai!',
+                          ? lang.t('tap_to_hide')
+                          : lang.t('tap_for_motivation'),
                       style: TextStyle(
                         fontSize: 12,
                         color: colors.appBarUnpickedColor,
@@ -248,20 +299,25 @@ class AvatarPageState extends State<AvatarPage>
 
               const SizedBox(height: 10),
 
-              // ── Name + level card ────────────────────────────────────
+              // ── NAME + LEVEL ─────────────────────────────────────
+
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 18, vertical: 16),
+                  horizontal: 18,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: colors.background2,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
+
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+
                           Text(
                             petName,
                             style: TextStyle(
@@ -270,9 +326,11 @@ class AvatarPageState extends State<AvatarPage>
                               color: colors.textColor,
                             ),
                           ),
+
                           const SizedBox(height: 2),
+
                           Text(
-                            '"${petRarity}"',
+                            '"$petRarity"',
                             style: TextStyle(
                               fontSize: 12,
                               color: colors.appBarUnpickedColor,
@@ -281,7 +339,7 @@ class AvatarPageState extends State<AvatarPage>
                         ],
                       ),
                     ),
-                    // Level circle
+
                     Container(
                       width: 70,
                       height: 70,
@@ -289,11 +347,14 @@ class AvatarPageState extends State<AvatarPage>
                         color: colors.background2,
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: colors.intenseColor, width: 2),
+                          color: colors.intenseColor,
+                          width: 2,
+                        ),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+
                           Text(
                             '$userLevel',
                             style: TextStyle(
@@ -303,8 +364,9 @@ class AvatarPageState extends State<AvatarPage>
                               height: 1,
                             ),
                           ),
+
                           Text(
-                            'Lygis',
+                            lang.t('level'),
                             style: TextStyle(
                               fontSize: 14,
                               color: colors.intenseColor,
@@ -319,75 +381,103 @@ class AvatarPageState extends State<AvatarPage>
 
               const SizedBox(height: 10),
 
-              // ── Stats + Apranga card ─────────────────────────────────
-        Row(
-        children: [
-        // Stats card
-        Expanded(
-        child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-        color: colors.background2,
-        borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-        _StatRow('Dienų streakas', '$streak', colors),
-        const SizedBox(height: 8),
-        _StatRow('Patirties taškai', '$userXp | $nextLevelXp', colors),
-        ],
-        ),
-        ),
-        ),
+              // ── STATS ────────────────────────────────────────────
 
-        const SizedBox(width: 10),
+              Row(
+                children: [
 
-        // Apranga card
-        GestureDetector(
-        onTap: () {
-        // TODO: open wardrobe
-        },
-        child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-        decoration: BoxDecoration(
-        color: colors.primary,
-        borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-        'Apranga',
-        style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        color: colors.textColor,
-        ),
-        ),
-        ),
-        ),
-        ],
-        ),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.background2,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+
+                          _StatRow(
+                            lang.t('days_streak'),
+                            '$streak',
+                            colors,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          _StatRow(
+                            lang.t('experience_points'),
+                            '$userXp | $nextLevelXp',
+                            colors,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  GestureDetector(
+                    onTap: () {
+                      // TODO
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        lang.t('wardrobe'),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: colors.textColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         );
       },
     );
-
   }
 
-  Widget _StatRow(String label, String value, AppColors colors) {
+  Widget _StatRow(
+      String label,
+      String value,
+      AppColors colors,
+      ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: TextStyle(fontSize: 13, color: colors.textColor)),
-        Text(value,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: colors.textColor)),
+
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: colors.textColor,
+          ),
+        ),
+
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: colors.textColor,
+          ),
+        ),
       ],
     );
   }
-
-
 }

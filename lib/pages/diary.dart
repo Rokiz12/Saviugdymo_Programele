@@ -15,6 +15,7 @@ import '../data/repositories/diary_question_repository.dart';
 import '../data/models/diary_question_model.dart';
 import '../services/reward_service.dart';
 import '../services/reward_notifier.dart';
+import '../services/language_notifier.dart';
 
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -111,7 +112,7 @@ class _DiaryPageState extends State<DiaryPage> {
 
   final DiaryRepository _repository = DiaryRepository();
   final DiaryQuestionRepository _questionRepository = DiaryQuestionRepository();
-  
+
   final String _userId = FirebaseAuth.instance.currentUser!.uid;
 
   // Memories Tab Variables
@@ -143,15 +144,37 @@ class _DiaryPageState extends State<DiaryPage> {
     TextEditingController(), 
     TextEditingController(), 
   ];
+  List<String> _moods(LanguageNotifier lang) => [
+    lang.t('diary_mood_great'),
+    lang.t('diary_mood_good'),
+    lang.t('diary_mood_normal'),
+    lang.t('diary_mood_poor'),
+    lang.t('diary_mood_bad'),
+  ];
 
-  final List<String> _weekDays = ['P', 'A', 'T', 'K', 'P', 'Š', 'S'];
-  final List<String> _moods = ['Puikiai', 'Gerai', 'Normaliai', 'Prastai', 'Blogai'];
-  final List<String> _moodEmojis = ['😀', '🙂', '😐', '😢', '😭'];
+  final List<String> _moodEmojis = [
+    '😀',
+    '🙂',
+    '😐',
+    '😢',
+    '😭'
+  ];
+
+  List<String> _weekDays(LanguageNotifier lang) => [
+    lang.t('mon_short'),
+    lang.t('tue_short'),
+    lang.t('wed_short'),
+    lang.t('thu_short'),
+    lang.t('fri_short'),
+    lang.t('sat_short'),
+    lang.t('sun_short'),
+  ];
 
   bool _isPremium = false;
 
   @override
   void initState() {
+
     super.initState();
     _selectedUploadCategory = _categories.first;
     _loadQuestions();
@@ -275,8 +298,9 @@ class _DiaryPageState extends State<DiaryPage> {
       );
       return;
     }
+    final lang = context.read<LanguageNotifier>();
 
-    if (_moods.indexOf(selectedMood) <= 1) {
+    if (_moods(lang).indexOf(selectedMood) <= 1) {
       SoundService.playHappyDiary();
     } else {
       SoundService.playSadDiary();
@@ -318,7 +342,7 @@ class _DiaryPageState extends State<DiaryPage> {
         DiaryEntryModel(
           id: id,
           createdAt: now,
-          mood: '${_moodEmojis[_moods.indexOf(selectedMood)]} $selectedMood',
+          mood: '${_moodEmojis[_moods(lang).indexOf(selectedMood)]} $selectedMood',
           highlight: textControllers[0].text,
           better: textControllers[1].text,
           gratitude: textControllers[2].text,
@@ -404,16 +428,17 @@ class _DiaryPageState extends State<DiaryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
     return DefaultTabController(
       length: 3,
       child: Scaffold(
         appBar: CustomAppBar(
           title: 'Dienoraštis',
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.add), text: "Naujas"),
-              Tab(icon: Icon(Icons.calendar_month), text: "Kalendorius"),
-              Tab(icon: Icon(Icons.photo_library), text: "Prisiminimai"),
+              Tab(icon: Icon(Icons.add), text: lang.t('diary_new')),
+              Tab(icon: Icon(Icons.calendar_month), text: lang.t('diary_calendar')),
+              Tab(icon: Icon(Icons.photo_library), text: lang.t('diary_memories')),
             ],
           ),
         ),
@@ -441,6 +466,7 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Widget _buildNewEntryTab() {
+    final lang = context.watch<LanguageNotifier>();
     if (!_questionsLoaded) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -476,7 +502,7 @@ class _DiaryPageState extends State<DiaryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children:[
-          const Text("Kaip jautiesi?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(lang.t('diary_m'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -493,12 +519,12 @@ class _DiaryPageState extends State<DiaryPage> {
               ),
           ],
           
-          _buildField("Laisvas dienoraštis", 3, maxLines: 4),
+          _buildField(lang.t('diary_diary_entry'), 3, maxLines: 4),
           
           const SizedBox(height: 24),
           
-          const Text(
-            "Prisegti nuotrauką (neprivaloma)",
+          Text(
+            lang.t('diary_add_photo'),
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -536,12 +562,12 @@ class _DiaryPageState extends State<DiaryPage> {
                         ),
                       ],
                     )
-                  : const Column(
+                  : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children:[
                         Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey),
                         SizedBox(height: 8),
-                        Text("Paspauskite, kad pridėtumėte", style: TextStyle(color: Colors.grey)),
+                        Text(lang.t('diary_press_to_add'), style: TextStyle(color: Colors.grey)),
                       ],
                     ),
             ),
@@ -578,7 +604,7 @@ class _DiaryPageState extends State<DiaryPage> {
               foregroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
             ),
-            child: const Text("Išsaugoti įrašą", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(lang.t('save_entry'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
@@ -586,6 +612,7 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Widget _buildCalendarTab() {
+    final lang = context.watch<LanguageNotifier>();
     return Column(
       children:[
         Container(
@@ -603,7 +630,7 @@ class _DiaryPageState extends State<DiaryPage> {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: _weekDays.map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold))))).toList(),
+            children: _weekDays(lang).map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold))))).toList(),
           ),
         ),
         Expanded(
@@ -642,7 +669,7 @@ class _DiaryPageState extends State<DiaryPage> {
           child: ElevatedButton.icon(
             onPressed: () => DefaultTabController.of(context).animateTo(0),
             icon: const Icon(Icons.add),
-            label: const Text("Pridėti naują įrašą"),
+            label: Text(lang.t('diary_add_new_entry')),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.yellow,
               foregroundColor: Colors.black,
@@ -1180,20 +1207,21 @@ class _DiaryPageState extends State<DiaryPage> {
   }
 
   Widget _moodBtn(int i) {
+    final lang = context.watch<LanguageNotifier>();
     return GestureDetector(
-      onTap: () => setState(() => selectedMood = _moods[i]),
+      onTap: () => setState(() => selectedMood = _moods(lang)[i]),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: selectedMood == _moods[i] ? Colors.yellow[200] : Colors.grey[200],
+              color: selectedMood == _moods(lang)[i] ? Colors.yellow[200] : Colors.grey[200],
               borderRadius: BorderRadius.circular(12),
-              border: selectedMood == _moods[i] ? Border.all(color: Colors.yellow[800]!, width: 2) : null,
+              border: selectedMood == _moods(lang)[i] ? Border.all(color: Colors.yellow[800]!, width: 2) : null,
             ),
             child: Text(_moodEmojis[i], style: const TextStyle(fontSize: 24)),
           ),
-          Text(_moods[i], style: const TextStyle(fontSize: 10)),
+          Text(_moods(lang)[i], style: const TextStyle(fontSize: 10)),
         ],
       ),
     );

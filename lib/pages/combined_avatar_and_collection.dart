@@ -3,6 +3,8 @@ import 'package:pvp/pages/avatar.dart';
 import 'package:pvp/pages/minigames.dart';
 import '../widgets/custom_app_bar.dart';
 import '../theme/app_theme.dart';
+import '../services/language_notifier.dart';
+import 'package:provider/provider.dart';
 
 class CombinedAvatarAndCollectionPage extends StatefulWidget {
   final String userId;
@@ -29,6 +31,7 @@ class _CombinedAvatarAndCollectionPageState extends State<CombinedAvatarAndColle
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     return Scaffold(
       backgroundColor: colors.background,

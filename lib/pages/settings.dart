@@ -83,7 +83,7 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.star,
                 iconColor: Colors.amber,
                 title: 'Premium',
-                subtitle: 'Neaktyvi',
+                subtitle: lang.t('premium_activated_false'),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(

@@ -29,7 +29,6 @@ class _AvatarPageState extends State<AvatarPage>
   late Animation<double> _floatingAnimation;
   double _avatarScale = 1.0;
 
-
   StreamSubscription? _userSubscription;
   UserModel? _user;
 
@@ -63,7 +62,6 @@ class _AvatarPageState extends State<AvatarPage>
     _loadQuotes();
   }
 
-  //
   void _startListening() {
     _userSubscription = FirebaseFirestore.instance
         .collection('users')
@@ -107,7 +105,6 @@ class _AvatarPageState extends State<AvatarPage>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            // Read live from _user every rebuild
             final petProgress = _user?.ownedPets[equippedPetId];
             final unlockedSkins = petProgress?.unlockedSkins ?? [];
             final equippedSkin = petProgress?.equippedSkinKey ?? '';
@@ -124,7 +121,6 @@ class _AvatarPageState extends State<AvatarPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle bar
                   Center(
                     child: Container(
                       width: 40,
@@ -148,7 +144,6 @@ class _AvatarPageState extends State<AvatarPage>
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    // +1 for the "no skin" default tile
                     itemCount: allSkins.length + 1,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
@@ -156,7 +151,6 @@ class _AvatarPageState extends State<AvatarPage>
                       mainAxisSpacing: 10,
                     ),
                     itemBuilder: (_, i) {
-                      // First tile = default (no skin)
                       if (i == 0) {
                         final isEquipped = equippedSkin.isEmpty;
                         return GestureDetector(
@@ -321,12 +315,8 @@ class _AvatarPageState extends State<AvatarPage>
       return const Center(child: Text("User not found"));
     }
 
-    final userXp = user.xp;
-    final userLevel = user.level;
-    const nextLevelXp = 100;
     final streak = user.streak;
 
-    // FutureBuilder only for pet, user is already live
     return FutureBuilder<PetModel?>(
       future: _petFuture,
       builder: (context, petSnapshot) {
@@ -336,9 +326,14 @@ class _AvatarPageState extends State<AvatarPage>
         final pet = _cachedPet;
 
         final petProgress = user.ownedPets[user.equippedPetId];
+        
+        // --- ČIA IMAME GYVŪNĖLIO LYGĮ IR XP UŽUOT VARTOTOJO ---
+        final petLevel = petProgress?.level ?? 1;
+        final petXp = petProgress?.xp ?? 0;
+        const petNextLevelXp = 100; // Galite pakeisti pagal savo XP logiką
+
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
-        final duplicateCount = petProgress?.duplicateCount ?? 0;
         final equippedSkin = petProgress?.equippedSkinKey ?? '';
         final themeKey = context.colors.petImageKey;
         final imageUrl = equippedSkin.isNotEmpty
@@ -490,7 +485,7 @@ class _AvatarPageState extends State<AvatarPage>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            '$userLevel',
+                            '$petLevel', // Rodomas gyvūnėlio lygis
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
@@ -523,10 +518,15 @@ class _AvatarPageState extends State<AvatarPage>
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _StatRow('Dienų streakas', '$streak', colors),
-                          const SizedBox(height: 8),
-                          _StatRow('Patirties taškai', '$userXp | $nextLevelXp', colors),
+                          const SizedBox(height: 12),
+                          _InteractiveXpBar(
+                            xp: petXp, // Rodomas gyvūnėlio XP
+                            nextLevelXp: petNextLevelXp,
+                            colors: colors,
+                          ),
                         ],
                       ),
                     ),
@@ -572,6 +572,113 @@ class _AvatarPageState extends State<AvatarPage>
                 fontWeight: FontWeight.w500,
                 color: colors.textColor)),
       ],
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// INTERAKTYVUS XP VALDIKLIS
+// -------------------------------------------------------------
+class _InteractiveXpBar extends StatefulWidget {
+  final int xp;
+  final int nextLevelXp;
+  final AppColors colors;
+
+  const _InteractiveXpBar({
+    required this.xp,
+    required this.nextLevelXp,
+    required this.colors,
+  });
+
+  @override
+  State<_InteractiveXpBar> createState() => _InteractiveXpBarState();
+}
+
+class _InteractiveXpBarState extends State<_InteractiveXpBar> {
+  bool _isPressed = false;
+  bool _showPercentage = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (widget.xp / widget.nextLevelXp).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() {
+          _isPressed = false;
+          _showPercentage = !_showPercentage;
+        });
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          color: Colors.transparent, // Užtikrina, kad visas plotas reaguotų į paspaudimus
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Patirties taškai',
+                        style: TextStyle(fontSize: 13, color: widget.colors.textColor),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Text(
+                      _showPercentage
+                          ? '${(progress * 100).toInt()}%'
+                          : '${widget.xp} / ${widget.nextLevelXp}',
+                      key: ValueKey(_showPercentage),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: widget.colors.textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Animating Progress Bar
+              Container(
+                height: 8,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: widget.colors.background,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.easeOutCubic,
+                          width: constraints.maxWidth * progress,
+                          decoration: BoxDecoration(
+                            color: widget.colors.intenseColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

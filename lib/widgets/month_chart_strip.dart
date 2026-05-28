@@ -106,21 +106,14 @@ class _MonthChartStripState extends State<MonthChartStrip> {
               final active = (_page.round() == index);
               return Center(
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: active ? colors.intenseColor : colors.background2,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _label(month),
-                    style: TextStyle(
-                      color: colors.textColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
+  duration: const Duration(milliseconds: 200),
+  width: 12,
+  height: 12,
+  decoration: BoxDecoration(
+    color: active ? colors.intenseColor : colors.background2,
+    shape: BoxShape.circle,
+  ),
+),
               );
             },
           ),

@@ -70,14 +70,14 @@ class DiaryDialogs {
     final colors = context.colors;
 
     // Premium gate: max 1 category for free users
-    if (!provider.isPremium && provider.categories.length >= 1) {
+    if (!provider.isPremium && provider.categories.length >= 3) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           backgroundColor: colors.background2,
           title: Text("⭐ Premium funkcija", style: TextStyle(color: colors.textColor)),
           content: Text(
-            "Nemokama versija leidžia turėti tik 1 kategoriją. Gauk Premium ir turėk neribotai!",
+            "Nemokama versija leidžia turėti tik 3 kategorijas. Gauk Premium ir turėk neribotai!",
             style: TextStyle(color: colors.appBarUnpickedColor),
           ),
           actions: [
@@ -100,10 +100,10 @@ class DiaryDialogs {
           ],
         ),
       );
-      return; // ← stop here, don't show add dialog
+      return; 
     }
 
-    // Free user with 0 categories OR premium user — show normal dialog
+    // Free user with 0 categories OR premium user
     final TextEditingController catController = TextEditingController();
     showDialog(
       context: context,
@@ -218,6 +218,99 @@ class DiaryDialogs {
     );
   }
 
+  // --- NAUJA FUNKCIJA: Atidaro visus atsakymus ---
+  static void showDetailedAnswersSheet(BuildContext context, DiaryEntryModel e, AppColors colors) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.background2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7, 
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  // Pilka juostelė viršuje
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.appBarUnpickedColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  Text(
+                    'Visi atsakymai',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: colors.textColor),
+                  ),
+                  const SizedBox(height: 24),
+
+                  if (e.highlight.isEmpty && e.better.isEmpty && e.gratitude.isEmpty && e.diaryText.isEmpty)
+                    Text("Šiame įraše nėra tekstinių atsakymų.", style: TextStyle(color: colors.textColor)),
+
+                  if (e.highlight.isNotEmpty)
+                    _buildDetailCard('Kas gero nutiko?', e.highlight, colors),
+
+                  if (e.better.isNotEmpty)
+                    _buildDetailCard('Ką galėjau padaryti geriau?', e.better, colors),
+
+                  if (e.gratitude.isNotEmpty)
+                    _buildDetailCard('Už ką esu dėkingas?', e.gratitude, colors),
+
+                  if (e.diaryText.isNotEmpty)
+                    _buildDetailCard('Laisvas dienoraštis', e.diaryText, colors),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Pagalbinis vizualus blokas klausimui-atsakymui
+  static Widget _buildDetailCard(String question, String answer, AppColors colors) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              question,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.textColor),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              answer,
+              style: TextStyle(fontSize: 16, color: colors.textColor, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- ATNAUJINTAS PRADINIS LANGAS (su mygtuku) ---
   static void showEntryDialog(BuildContext context, DiaryEntryModel e) {
     final colors = context.colors;
     final dateStr = '${e.createdAt.year}-${e.createdAt.month.toString().padLeft(2, '0')}-${e.createdAt.day.toString().padLeft(2, '0')}';
@@ -243,15 +336,34 @@ class DiaryDialogs {
                   ),
                 ],
               ),
-              if (e.highlight.isNotEmpty) ...[const SizedBox(height: 12), Text("✨ ${e.highlight}", style: TextStyle(color: colors.textColor))],
-              if (e.diaryText.isNotEmpty) ...[const SizedBox(height: 12), Text("📖 ${e.diaryText}", style: TextStyle(color: colors.textColor))],
+              //if (e.highlight.isNotEmpty) ...[const SizedBox(height: 12), Text("✨ ${e.highlight}", style: TextStyle(color: colors.textColor))],
+              //if (e.diaryText.isNotEmpty) ...[const SizedBox(height: 12), Text("📖 ${e.diaryText}", style: TextStyle(color: colors.textColor))],
               if (e.imageUrl != null && e.imageUrl!.isNotEmpty) ...[
                  const SizedBox(height: 16),
                  ClipRRect(
                    borderRadius: BorderRadius.circular(14),
                    child: CachedNetworkImage(imageUrl: e.imageUrl!, fit: BoxFit.contain, placeholder: (context, url) => Center(child: CircularProgressIndicator(color: colors.intenseColor))),
                  ),
-              ]
+              ],
+              
+              const SizedBox(height: 24),
+              
+              // NAUJAS MYGTUKAS KURIS ATIDARO VISUS ATSAKYMUS
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context); // Uždaro šitą mažą langelį
+                  showDetailedAnswersSheet(context, e, colors); // Atidaro naują didelį langą
+                },
+                icon: const Icon(Icons.menu_book),
+                label: const Text("Skaityti visus atsakymus"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.intenseColor,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+              )
             ],
           ),
         ),
@@ -279,7 +391,8 @@ class DiaryDialogs {
             ...entries.map((e) => ListTile(
               leading: e.moodImage != null && e.moodImage!.isNotEmpty
                   ? Image.asset(e.moodImage!, width: 32, height: 32)
-                  : Text(e.mood.split(' ')[0], style: const TextStyle(fontSize: 24)),              title: Text('${e.createdAt.hour}:${e.createdAt.minute.toString().padLeft(2, '0')}', style: TextStyle(color: colors.textColor)),
+                  : Text(e.mood.split(' ')[0], style: const TextStyle(fontSize: 24)),              
+              title: Text('${e.createdAt.hour}:${e.createdAt.minute.toString().padLeft(2, '0')}', style: TextStyle(color: colors.textColor)),
               subtitle: Text(e.preview, maxLines: 1, style: TextStyle(color: colors.appBarUnpickedColor)),
               onTap: () { Navigator.pop(context); showEntryDialog(context, e); },
             )),

@@ -28,14 +28,14 @@ class SettingsPage extends StatelessWidget {
             children: [
               _SettingsTile(
                 icon: Icons.person,
-                iconColor: Colors.yellow,
+                iconColor: getAdaptiveIconColor(context, Colors.yellow),
                 title: "Vardas",
                 subtitle: "Vartotojas",
                 onTap: () {},
               ),
               _SettingsTile(
                 icon: Icons.email,
-                iconColor: colors.intenseColor,
+                iconColor: getAdaptiveIconColor(context, colors.intenseColor),
                 title: "El. paštas",
                 subtitle: FirebaseAuth.instance.currentUser?.email ?? "Nėra el. pašto",
                 onTap: () {},
@@ -198,6 +198,14 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
+Color getAdaptiveIconColor(BuildContext context, Color baseColor) {
+  final isLight = Theme.of(context).brightness == Brightness.light;
+
+  if (!isLight) return baseColor;
+
+  // darken slightly for light theme
+  return Color.lerp(baseColor, Colors.black, 0.25)!;
+}
 // ================= UI COMPONENTAI =================
 
 // Kortelė
@@ -302,7 +310,11 @@ class _SettingsTile extends StatelessWidget {
                   color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(
+  icon,
+  color: colors.textColor.withValues(alpha: 0.55),
+  size: 24,
+),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -374,7 +386,11 @@ class _SettingsRadioTile extends StatelessWidget {
                   color: colors.background,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: colors.primary, size: 24),
+                child: Icon(
+  icon,
+  color: colors.textColor.withValues(alpha: 0.55),
+  size: 24,
+),
               ),
               const SizedBox(width: 16),
               Expanded(

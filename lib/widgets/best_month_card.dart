@@ -85,7 +85,7 @@ class _BestMonthCardState extends State<BestMonthCard>
               Icon(Icons.emoji_events_outlined, size: 15, color: amber),
               const SizedBox(width: 6),
               Text(
-                'BEST MONTH',
+                'GERIAUSIAS MĖNUO',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -130,7 +130,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                             ),
                           ),
                           Text(
-                            'done',
+                            'atlikta',
                             style: TextStyle(
                               fontSize: 11,
                               color: Theme.of(context).colorScheme.onSurface
@@ -148,7 +148,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${(widget.completionRate * 100).round()}% completed',
+                    '${(widget.completionRate * 100).round()}% atlikta',
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -156,7 +156,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Your highest rate\nacross all months',
+                    'Aukščiausias rezultatas\nper visus mėnesius',
                     style: TextStyle(
                       fontSize: 13,
                       color: Theme.of(context)
@@ -181,7 +181,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.calendar_month_outlined,
                 iconColor: const Color(0xFF639922),
                 value: '${widget.completedDays} / ${widget.totalDays}',
-                label: 'days completed',
+                label: 'atlikta dienų',
                 surface: surface,
               )),
               const SizedBox(width: 12),
@@ -189,7 +189,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.local_fire_department_outlined,
                 iconColor: const Color(0xFFD85A30),
                 value: '${widget.longestStreak} days',
-                label: 'longest streak',
+                label: 'ilgiausias streak',
                 surface: surface,
               )),
             ],
@@ -201,7 +201,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.checklist_outlined,
                 iconColor: const Color(0xFF378ADD),
                 value: '${widget.habitsLogged}',
-                label: 'habits logged',
+                label: 'įpročiai užfiksuoti',
                 surface: surface,
               )),
               const SizedBox(width: 12),
@@ -209,7 +209,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.track_changes_outlined,
                 iconColor: const Color(0xFF7F77DD),
                 value: '4 / 4',
-                label: 'goals on track',
+                label: 'tikslai vykdomi',
                 surface: surface,
               )),
             ],
@@ -221,7 +221,7 @@ class _BestMonthCardState extends State<BestMonthCard>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'vs. monthly average (${(widget.avgRate * 100).round()}%)',
+                'lyginant su mėnesio vidurkiu (${(widget.avgRate * 100).round()}%)',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context)
@@ -273,7 +273,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  'Better than ',
+                  'Geresnis nei ',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context)

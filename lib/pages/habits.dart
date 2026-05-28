@@ -12,8 +12,6 @@ import '../widgets/custom_app_bar.dart';
 import '../widgets/reusables.dart';
 import '../theme/app_theme.dart';
 
-
-
 class HabitsPage extends StatefulWidget {
   final String userId;
   const HabitsPage({super.key, required this.userId});
@@ -30,8 +28,10 @@ class _HabitsPageState extends State<HabitsPage> {
   List<DayLog> _monthLogs = [];
   DayLog? _today;
 
-  // Stores today's live step count for display in the row
   int _todaySteps = 0;
+
+  bool _showCompleteAnimation = false;
+  String? _completedHabitName;
 
   ForegroundTimeTracker? _tracker;
 
@@ -46,7 +46,7 @@ class _HabitsPageState extends State<HabitsPage> {
   Future<void> _initialize() async {
     await _loadInitial();
     await _ensureAutoHabitExists();
-    await _syncStepHabits(); // ← on-launch step check
+    await _syncStepHabits(); 
   }
 
   // ─── DATA LOAD ──────────────────────────────────────────────────────────────
@@ -84,38 +84,55 @@ class _HabitsPageState extends State<HabitsPage> {
 
   // ─── STEP SYNC ──────────────────────────────────────────────────────────────
 
-  /// Called on every app launch. Reads today's steps from Health Connect,
-  /// updates _todaySteps for the UI, saves the count to the DayLog,
-  /// and marks any step habit as complete if its goal is reached.
   Future<void> _syncStepHabits() async {
     final stepHabits = _habits.where((h) => h.kind == RatingKind.steps).toList();
     if (stepHabits.isEmpty) return;
 
     final steps = await StepService.getTodaySteps();
-    if (steps == null) return; // permission denied or read failed — silent, try again next launch
+    if (steps == null) return; 
 
-    // Keep for live display in the row
     if (mounted) setState(() => _todaySteps = steps);
 
-    // Save step count and mark complete when goal is reached
     for (final h in stepHabits) {
       final goal   = h.stepGoal ?? 0;
       final isDone = steps >= goal && goal > 0;
-
-      // Always write the step count so the progress bar stays current
       _saveStepValue(h, steps, markDone: isDone);
     }
   }
 
-  /// Persists the step count into the DayLog and optionally marks it done.
+  void _triggerCompleteAnimation(String habitName) {
+    setState(() {
+      _completedHabitName = habitName;
+      _showCompleteAnimation = true;
+    });
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() {
+        _showCompleteAnimation = false;
+      });
+    });
+  }
+
   void _saveStepValue(Habit h, int steps, {required bool markDone}) {
     final now    = DateTime.now().toUtc();
     final logDay = DateTime.utc(now.year, now.month, now.day);
 
     DayLog log = _today ?? DayLog(dateUtc: logDay, entries: {});
+    
+    // Check if we just hit the goal to avoid spamming animation on launch
+    bool shouldAnimate = false;
+    if (markDone) {
+      final prev = log.entries[h.id];
+      final prevSteps = prev is NumberValue ? prev.value : 0;
+      final goal = h.stepGoal ?? 0;
+      if (prevSteps < goal && steps >= goal) {
+        shouldAnimate = true;
+      }
+    }
+
     log = log.setValue(h.id, NumberValue(steps));
 
-    // ── keep _monthLogs in sync so goal progress reads the same value ──
     final idx = _monthLogs.indexWhere(
           (l) => l.dateUtc.year  == logDay.year &&
           l.dateUtc.month == logDay.month &&
@@ -134,7 +151,10 @@ class _HabitsPageState extends State<HabitsPage> {
 
     _repo.upsertDayLog(userId: widget.userId, log: log);
 
-    if (markDone) SoundService.playMarkHabit();
+    if (shouldAnimate) {
+      SoundService.playMarkHabit();
+      _triggerCompleteAnimation(h.name);
+    } 
   }
 
   // ─── GOAL PROGRESS ──────────────────────────────────────────────────────────
@@ -199,7 +219,6 @@ class _HabitsPageState extends State<HabitsPage> {
     final initVal = _initialValueFor(habit);
     if (initVal != null) _setValue(habit, initVal);
 
-    // If a step habit was just created, sync immediately
     if (habit.kind == RatingKind.steps) await _syncStepHabits();
   }
 
@@ -308,7 +327,7 @@ class _HabitsPageState extends State<HabitsPage> {
             ? EnumValue(h.options!.first)
             : null;
       case RatingKind.steps:
-        return const NumberValue(0); // step count starts at 0
+        return const NumberValue(0);
     }
   }
 
@@ -344,11 +363,42 @@ class _HabitsPageState extends State<HabitsPage> {
   void _setValue(Habit h, RatingValue v) {
     SoundService.playMarkHabit();
 
-    final newLog = (_today ??
-        DayLog(dateUtc: DateTime.now().toUtc(), entries: {}))
-        .setValue(h.id, v);
+    bool shouldAnimate = false;
 
-    setState(() => _today = newLog);
+    // Teisinga varnelių logika: tikriname, ar pasikeitė iš false į true
+    if (h.kind == RatingKind.checkbox && v is BoolValue) {
+      final prev = _today?.entries[h.id];
+      final wasChecked = prev is BoolValue ? prev.value : false;
+      
+      if (!wasChecked && v.value == true) {
+        shouldAnimate = true;
+      }
+    } 
+
+    if (shouldAnimate) {
+      _triggerCompleteAnimation(h.name);
+    }
+
+    final newLog = (_today ?? DayLog(dateUtc: DateTime.now().toUtc(), entries: {})).setValue(h.id, v);
+
+    setState(() {
+      _today = newLog;
+
+      final now = DateTime.now().toUtc();
+      final idx = _monthLogs.indexWhere((l) =>
+          l.dateUtc.year == now.year &&
+          l.dateUtc.month == now.month &&
+          l.dateUtc.day == now.day);
+
+      if (idx >= 0) {
+        _monthLogs[idx] = newLog;
+      } else {
+        _monthLogs.add(newLog);
+      }
+
+      _monthLogs = List.from(_monthLogs);
+    });
+
     _repo.upsertDayLog(userId: widget.userId, log: newLog);
   }
 
@@ -378,26 +428,104 @@ class _HabitsPageState extends State<HabitsPage> {
 
   @override
   Widget build(BuildContext context) {
-
     if (_today == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
       appBar: const CustomAppBar(title: "Įpročiai"),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        child: Column(
-          children: [
-            _buildHabitsSection(),
-            const SizedBox(height: 80),
-            _buildGoalsSection(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          // 1. Pagrindinis turinys, ištemptas per visą ekraną
+          Positioned.fill(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              child: Column(
+                children: [
+                  _buildHabitsSection(),
+                  const SizedBox(height: 80),
+                  _buildGoalsSection(),
+                ],
+              ),
+            ),
+          ),
+
+          // 2. Animacijos sluoksnis. Naudojamas Positioned.fill, kad užimtų visą plotą
+          Positioned.fill(
+            child: _buildCompletionOverlay(),
+          ),
+        ],
       ),
     );
   }
 
+  // ─── ANIMATION WIDGET ───────────────────────────────────────────────────────
+
+  Widget _buildCompletionOverlay() {
+    // Optimizacija: jei animacija nereikalinga, išvis nepiešiame Containerio
+    if (!_showCompleteAnimation && _completedHabitName == null) {
+      return const SizedBox.shrink();
+    }
+
+    return IgnorePointer(
+      ignoring: !_showCompleteAnimation,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        color: _showCompleteAnimation ? Colors.black.withValues(alpha: 0.35) : Colors.transparent,
+        child: Center(
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: _showCompleteAnimation ? 1.0 : 0.0,
+            curve: Curves.easeInOut,
+            child: AnimatedScale(
+              scale: _showCompleteAnimation ? 1.0 : 0.5,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.elasticOut,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+                decoration: BoxDecoration(
+                  color: context.colors.intenseColor,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.colors.intenseColor.withValues(alpha: 0.5),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 72),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Puiku!",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "${_completedHabitName ?? ''} atlikta",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
 // ─── FAB ADD BUTTON ──────────────────────────────────────────────────────────
 
@@ -645,7 +773,6 @@ class _HabitsPageState extends State<HabitsPage> {
           },
         );
 
-    // ── Steps trailing widget ──────────────────────────────────────────────
       case RatingKind.steps:
         final goal     = h.stepGoal ?? 0;
         final steps    = _todaySteps;

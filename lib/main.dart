@@ -21,9 +21,11 @@ import 'widgets/reward_dialog.dart';
 import 'services/fcm_service.dart';
 import 'services/theme_notifier.dart';
 import 'theme/app_theme.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('lt_LT', null);
   await Firebase.initializeApp();
   preloadPetImages();
   runApp(

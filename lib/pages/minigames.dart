@@ -103,7 +103,7 @@ class _CollectionPageState extends State<CollectionPage> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _loadData,
-              child: const Text('Retry'),
+              child: const Text('Pakartoti'),
             ),
           ],
         ),
@@ -457,7 +457,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
         final part = lore['level_$i'];
         if (part != null) parts.add(part);
       }
-      return parts.isEmpty ? 'No lore available.' : parts.join('\n\n');
+      return parts.isEmpty ? 'Nėra istorijos.' : parts.join('\n\n');
     }
 
     return Container(
@@ -587,7 +587,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         _StatChip(
-                          label: 'Level',
+                          label: 'Lygis',
                           value: '${widget.userPet!.level}',
                           color: widget.rarityColor,
                         ),
@@ -608,7 +608,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      widget.isOwned ? 'Lore' : 'Lore (Locked)',
+                      widget.isOwned ? 'Istorija' : 'Istorija (Užrakinta)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -619,7 +619,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                   const SizedBox(height: 8),
                   if (!widget.isOwned)
                     Text(
-                      'Unlock this pet to reveal its secrets...',
+                      'Atrakinkite šį gyvūnėlį, kad atskleistumėte jo paslaptis...',
                       style: TextStyle(
                         fontSize: 14,
                         color: colors.appBarUnpickedColor,
@@ -677,7 +677,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                               color: widget.rarityColor.withValues(alpha: 0.7)),
                           const SizedBox(width: 8),
                           Text(
-                            'Equipped',
+                            'Pasirinkta',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -700,7 +700,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                           ),
                         )
                             : const Icon(Icons.check_circle_outline),
-                        label: Text(_isEquipping ? 'Equipping...' : 'Equip'),
+                        label: Text(_isEquipping ? 'Užsidedama...' : 'Pasirinkti'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: widget.rarityColor,
                           foregroundColor: colors.background,

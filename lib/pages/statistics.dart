@@ -451,7 +451,7 @@ class _StatisticsPageState extends State<StatisticsPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-                Text(DateFormat.yMMMM().format(_currentMonth),
+                Text(DateFormat.yMMMM('lt').format(_currentMonth),
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(
                   icon: Icon(
@@ -517,7 +517,7 @@ class _StatisticsPageState extends State<StatisticsPage>
           ],
           if (best != null)
             BestMonthCard(
-              monthName: DateFormat.yMMMM().format(best.month),
+              monthName: DateFormat.yMMMM("lt").format(best.month),
               completionRate: best.completionRate,
               completedDays: best.completedDays,
               totalDays: best.totalDays,
@@ -546,7 +546,7 @@ class _StatisticsPageState extends State<StatisticsPage>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-          Text(DateFormat.yMMMM().format(_currentMonth),
+          Text(DateFormat.yMMMM("lt").format(_currentMonth),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           IconButton(
             icon: Icon(

@@ -12,6 +12,7 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color textColor;
   final List<String> moodImages;
   final String logo;
+  final String petImageKey; // petu nuotraukos pagal mode avatarui ir kolekcijai
 
 
   const AppColors({
@@ -23,6 +24,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.textColor,
     required this.moodImages,
     required this.logo,
+    required this.petImageKey,
   });
 
 
@@ -39,7 +41,7 @@ class AppColors extends ThemeExtension<AppColors> {
       'assets/ui/emojis/light_mood_eh.png',
       'assets/ui/emojis/light_mood_bad.png'],
     logo: 'assets/ui/emojis/light_logo.png',
-
+    petImageKey: 'light_mode',
   );
 
   static const dark = AppColors(
@@ -55,8 +57,7 @@ class AppColors extends ThemeExtension<AppColors> {
       'assets/ui/emojis/light_mood_eh.png',
       'assets/ui/emojis/light_mood_bad.png'],
     logo: 'assets/ui/emojis/dark_logo.png',
-
-
+    petImageKey: 'dark_mode',
   );
 
 
@@ -75,6 +76,7 @@ class AppColors extends ThemeExtension<AppColors> {
       textColor: textColor ?? this.textColor,
       moodImages: moodImages,
       logo: logo,
+      petImageKey: petImageKey,
     );
   }
 

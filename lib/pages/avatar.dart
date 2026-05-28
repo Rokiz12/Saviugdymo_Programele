@@ -9,6 +9,7 @@ import '../data/repositories/pet_repository.dart';
 import "package:cached_network_image/cached_network_image.dart";
 import '../data/repositories/quote_repository.dart';
 import '../theme/app_theme.dart';
+import '../data/models/user_pet_progress.dart';
 
 class AvatarPage extends StatefulWidget {
   final String userId;
@@ -89,6 +90,183 @@ class _AvatarPageState extends State<AvatarPage>
     });
   }
 
+  void _openWardrobe(PetModel pet, String equippedPetId) {
+    final colors = context.colors;
+
+    final allSkins = pet.images.keys
+        .where((k) => k.startsWith('skin_'))
+        .toList()
+      ..sort();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colors.background2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            // Read live from _user every rebuild
+            final petProgress = _user?.ownedPets[equippedPetId];
+            final unlockedSkins = petProgress?.unlockedSkins ?? [];
+            final equippedSkin = petProgress?.equippedSkinKey ?? '';
+
+            Future<void> tapSkin(String skinKey) async {
+              await _userRepository.equipSkin(widget.userId, equippedPetId, skinKey);
+              setSheetState(() {});
+              setState(() {});
+            }
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.appBarUnpickedColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Apranga',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    // +1 for the "no skin" default tile
+                    itemCount: allSkins.length + 1,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemBuilder: (_, i) {
+                      // First tile = default (no skin)
+                      if (i == 0) {
+                        final isEquipped = equippedSkin.isEmpty;
+                        return GestureDetector(
+                          onTap: () => tapSkin(''),
+                          child: Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: colors.background,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: isEquipped
+                                      ? Border.all(color: colors.intenseColor, width: 2)
+                                      : null,
+                                ),
+                                padding: const EdgeInsets.all(8),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.disabled_visible,
+                                    size: 36,
+                                    color: colors.appBarUnpickedColor,
+                                  ),
+                                ),
+                              ),
+                              if (isEquipped)
+                                Positioned(
+                                  top: 6,
+                                  left: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: BoxDecoration(
+                                      color: colors.intenseColor,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Icon(Icons.check, size: 12, color: Colors.white),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      final skinKey = allSkins[i - 1];
+                      final isOwned = unlockedSkins.contains(skinKey);
+                      final isEquipped = equippedSkin == skinKey;
+                      final skinUrl = pet.images[skinKey] ?? '';
+
+                      return GestureDetector(
+                        onTap: isOwned ? () => tapSkin(skinKey) : null,
+                        child: Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: colors.background,
+                                borderRadius: BorderRadius.circular(14),
+                                border: isEquipped
+                                    ? Border.all(color: colors.intenseColor, width: 2)
+                                    : null,
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              child: skinUrl.isEmpty
+                                  ? const Icon(Icons.pets)
+                                  : CachedNetworkImage(
+                                imageUrl: skinUrl,
+                                fit: BoxFit.contain,
+                                placeholder: (_, __) => const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                errorWidget: (_, __, ___) => const Icon(Icons.pets),
+                              ),
+                            ),
+                            if (!isOwned)
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.65),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(Icons.lock, size: 12, color: Colors.white),
+                                ),
+                              ),
+                            if (isEquipped)
+                              Positioned(
+                                top: 6,
+                                left: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: colors.intenseColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(Icons.check, size: 12, color: Colors.white),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _loadQuotes() async {
     final quotes = await _quoteRepository.getQuotes();
     if (mounted) {
@@ -161,9 +339,11 @@ class _AvatarPageState extends State<AvatarPage>
         final petName = pet?.name ?? "No Pet";
         final petRarity = pet?.rarity ?? "Common";
         final duplicateCount = petProgress?.duplicateCount ?? 0;
-        final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
-        final imageUrl =
-            pet?.images[imageKey] ?? pet?.images.values.firstOrNull ?? '';
+        final equippedSkin = petProgress?.equippedSkinKey ?? '';
+        final themeKey = context.colors.petImageKey;
+        final imageUrl = equippedSkin.isNotEmpty
+            ? (pet?.images[equippedSkin] ?? pet?.images[themeKey] ?? '')
+            : (pet?.images[themeKey] ?? pet?.images.values.firstOrNull ?? '');
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 32),
@@ -354,7 +534,7 @@ class _AvatarPageState extends State<AvatarPage>
                   const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () {
-                      // TODO: open wardrobe
+                      if (pet != null) _openWardrobe(pet, user.equippedPetId);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),

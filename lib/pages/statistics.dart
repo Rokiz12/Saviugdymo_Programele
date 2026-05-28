@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
-
 import '../data/repositories/user_repository.dart';
 import '../features/habits/data/HabitRepository.dart';
 import '../features/habits/models/models.dart';
@@ -34,7 +33,6 @@ class _MonthStats {
 class StatisticsPage extends StatefulWidget {
   final String userId;
 
-
   const StatisticsPage({
     super.key,
     required this.userId,
@@ -42,13 +40,14 @@ class StatisticsPage extends StatefulWidget {
 
   @override
   State<StatisticsPage> createState() => _StatisticsPageState();
-
 }
 
-class _StatisticsPageState extends State<StatisticsPage> {
-
+// FIX 1: Add SingleTickerProviderStateMixin for explicit TabController
+class _StatisticsPageState extends State<StatisticsPage>
+    with SingleTickerProviderStateMixin {
   bool _isPremium = false;
-
+  // FIX 2: Explicit TabController so tab position is preserved on month change
+  late TabController _tabController;
 
   _MonthStats? _computeBestMonth() {
     if (_habits.isEmpty) return null;
@@ -72,7 +71,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
       for (int d = 1; d <= daysInMonth; d++) {
         final date = DateTime(month.year, month.month, d);
-        
+
         // Skip future days
         if (date.isAfter(now)) break;
 
@@ -107,8 +106,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
         habitsLogged: habitsLogged,
       );
 
-
-
       if (best == null || stats.completionRate > best.completionRate) {
         best = stats;
       }
@@ -125,6 +122,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
   final DiaryRepository _diaryRepo = DiaryRepository();
 
   bool _loading = true;
+  // FIX 3: Separate flag so only the very first load shows a full-page spinner
+  bool _initialLoad = true;
+  bool _historyLoaded = false;
   List<Habit> _habits = [];
   Map<DateTime, DayLog> _logsByDay = {};
   List<DiaryEntryModel> _diaryEntries = [];
@@ -132,63 +132,81 @@ class _StatisticsPageState extends State<StatisticsPage> {
   @override
   void initState() {
     super.initState();
+    // FIX 2: init TabController here
+    _tabController = TabController(length: 2, vsync: this);
     _loadMonth();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   // ---------------------------------------------------------------------------
   // DATA LOADING
   // ---------------------------------------------------------------------------
-
   Future<void> _loadMonth() async {
     setState(() => _loading = true);
 
     try {
-      final habits = await _repo.getHabits(userId: widget.userId);
-      final now = DateTime.now();
+      if (!_historyLoaded) {
+        final habits = await _repo.getHabits(userId: widget.userId);
+        final user = await UserRepository().getUser(widget.userId);
+        final now = DateTime.now();
 
-      // IMPORTANT: Fetch logs for the last 12 months to support the trend line and comparisons
-      final start = DateTime.utc(now.year, now.month - 11, 1);
-      final end = DateTime.utc(now.year, now.month + 1, 0, 23, 59, 59);
+        final start = DateTime.utc(now.year, now.month - 11, 1);
+        final end = DateTime.utc(now.year, now.month + 1, 0, 23, 59, 59);
 
-      final logs = await _repo.getLogsForRange(
-        userId: widget.userId,
-        startInclusive: start,
-        endInclusive: end,
-      );
-
-      final map = <DateTime, DayLog>{};
-      for (final log in logs) {
-        final key = DateTime.utc(
-          log.dateUtc.year,
-          log.dateUtc.month,
-          log.dateUtc.day,
+        final logs = await _repo.getLogsForRange(
+          userId: widget.userId,
+          startInclusive: start,
+          endInclusive: end,
         );
-        map[key] = log;
+
+        final map = <DateTime, DayLog>{};
+        for (final log in logs) {
+          final key = DateTime.utc(
+            log.dateUtc.year,
+            log.dateUtc.month,
+            log.dateUtc.day,
+          );
+          map[key] = log;
+        }
+
+        _habits = habits;
+        _logsByDay = map;
+        _isPremium = user?.premium ?? false;
+        _historyLoaded = true;
       }
 
-      // Load diary entries for the current view month
       final viewStart = DateTime.utc(_currentMonth.year, _currentMonth.month, 1);
       final viewEnd = DateTime.utc(_currentMonth.year, _currentMonth.month + 1, 0, 23, 59, 59);
-      
-      final allDiaryEntries = await _diaryRepo.getEntriesForDateRange(
+
+      final diaryEntries = await _diaryRepo.getEntriesForDateRange(
         widget.userId,
         viewStart,
         viewEnd,
       );
 
-      final user = await UserRepository().getUser(widget.userId);
-
       setState(() {
-        _isPremium = user?.premium ?? false;
-        _habits = habits;
-        _logsByDay = map;
-        _diaryEntries = allDiaryEntries;
+        _diaryEntries = diaryEntries;
         _loading = false;
+        _initialLoad = false;
       });
     } catch (e) {
       print('Error loading: $e');
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _initialLoad = false;
+      });
     }
+  }
+
+  // FIX 4: Helper to check if we're already on the current month
+  bool _isCurrentMonth() {
+    final now = DateTime.now();
+    return _currentMonth.year == now.year && _currentMonth.month == now.month;
   }
 
   void _prevMonth() {
@@ -198,7 +216,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
     _loadMonth();
   }
 
+  // FIX 5: Guard _nextMonth so it can't go past the current month
   void _nextMonth() {
+    if (_isCurrentMonth()) return;
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
     });
@@ -223,15 +243,15 @@ class _StatisticsPageState extends State<StatisticsPage> {
       final entryDay = DateTime(e.createdAt.year, e.createdAt.month, e.createdAt.day);
       final targetDay = DateTime(day.year, day.month, day.day);
       return entryDay.year == targetDay.year &&
-             entryDay.month == targetDay.month &&
-             entryDay.day == targetDay.day;
+          entryDay.month == targetDay.month &&
+          entryDay.day == targetDay.day;
     }).toList();
 
     if (dayEntries.isEmpty) return 0;
 
     final sum = dayEntries.fold<int>(
       0,
-      (prev, entry) => prev + _moodToValue(entry.mood),
+          (prev, entry) => prev + _moodToValue(entry.mood),
     );
     return sum / dayEntries.length;
   }
@@ -309,7 +329,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    if (_loading) {
+    // FIX 3: Only show full-page spinner on the very first load
+    if (_initialLoad) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -320,27 +341,42 @@ class _StatisticsPageState extends State<StatisticsPage> {
     final firstWeekday = firstDayOfMonth.weekday; // 1 = Monday
     final totalCells = daysInMonth + (firstWeekday - 1);
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: CustomAppBar(
-          title: 'Statistika',
-          bottom: TabBar(
-            indicatorColor: colors.intenseColor,
-            labelColor: colors.textColor,
-            unselectedLabelColor: colors.appBarUnpickedColor,
-            tabs: const [
-              Tab(icon: Icon(Icons.check_circle), text: "Įpročiai"),
-              Tab(icon: Icon(Icons.mood), text: "Nuotaika"),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildHabitsTab(firstDayOfMonth, daysInMonth, firstWeekday, totalCells),
-            _buildMoodTab(),
+    return Scaffold(
+      // FIX 2: Pass explicit _tabController so switching months doesn't reset the tab
+      appBar: CustomAppBar(
+        title: 'Statistika',
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: colors.intenseColor,
+          labelColor: colors.textColor,
+          unselectedLabelColor: colors.appBarUnpickedColor,
+          tabs: const [
+            Tab(icon: Icon(Icons.check_circle), text: "Įpročiai"),
+            Tab(icon: Icon(Icons.mood), text: "Nuotaika"),
           ],
         ),
+      ),
+      // FIX 3: Show a thin progress bar during subsequent loads instead of a full spinner
+      body: Stack(
+        children: [
+          TabBarView(
+            controller: _tabController,
+            children: [
+              _buildHabitsTab(firstDayOfMonth, daysInMonth, firstWeekday, totalCells),
+              _buildMoodTab(),
+            ],
+          ),
+          if (_loading && !_initialLoad)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(
+                backgroundColor: Colors.transparent,
+                color: Colors.yellow,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -373,7 +409,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
         monthRateSum += ratio;
         if (ratio > 0) hasAnyData = true;
       }
-      
+
       final rate = monthDays > 0 ? monthRateSum / monthDays : 0.0;
       // We only count months that have some recorded activity in the average
       if (hasAnyData || rate > 0) {
@@ -382,7 +418,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
         historicalRates.add(rate);
       }
     }
-    
+
     final avgRate = monthsWithData > 0 ? historicalTotalRate / monthsWithData : 0.0;
 
     int betterThanCount = 0;
@@ -398,6 +434,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
         children: [
           MonthChartStrip(
             initialMonth: _currentMonth,
+            selectedMonth: _currentMonth,
             dataByMonth: _buildMonthChartData(),
             onMonthChanged: (m) {
               setState(() => _currentMonth = m);
@@ -407,6 +444,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           const SizedBox(height: 8),
 
+          // FIX 5: Month nav row with disabled right chevron on current month
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -414,8 +452,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
               children: [
                 IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
                 Text(DateFormat.yMMMM().format(_currentMonth),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: Icon(
+                    Icons.chevron_right,
+                    color: _isCurrentMonth() ? colors.appBarUnpickedColor : colors.textColor,
+                  ),
+                  onPressed: _isCurrentMonth() ? null : _nextMonth,
+                ),
               ],
             ),
           ),
@@ -459,7 +503,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     border: isToday ? Border.all(color: colors.intenseColor, width: 2) : null,
                   ),
                   child: Center(
-                    child: Text("$day", style: TextStyle(fontWeight: isToday ? FontWeight.bold : FontWeight.normal))),
+                      child: Text("$day", style: TextStyle(fontWeight: isToday ? FontWeight.bold : FontWeight.normal))),
                 );
               },
             ),
@@ -467,11 +511,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           const SizedBox(height: 32),
 
-          if (!_isPremium)
+          if (!_isPremium) ...[
             _PremiumBanner(),
             const SizedBox(height: 24),
-
-
+          ],
           if (best != null)
             BestMonthCard(
               monthName: DateFormat.yMMMM().format(best.month),
@@ -492,17 +535,52 @@ class _StatisticsPageState extends State<StatisticsPage> {
   }
 
   Widget _buildMoodTab() {
+    final colors = context.colors;
     final spots = _buildMoodChartData();
-    if (spots.isEmpty || spots.every((spot) => spot.y == 0)) {
-      return Center(
+    final hasData = spots.any((spot) => spot.y > 0);
+
+    // Month nav always rendered at the top
+    final monthNav = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
+          Text(DateFormat.yMMMM().format(_currentMonth),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: Icon(
+              Icons.chevron_right,
+              color: _isCurrentMonth() ? colors.appBarUnpickedColor : colors.textColor,
+            ),
+            onPressed: _isCurrentMonth() ? null : _nextMonth,
+          ),
+        ],
+      ),
+    );
+
+    if (!hasData) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.mood_bad, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text("Nėra nuotaikos duomenų", style: TextStyle(fontSize: 16, color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(onPressed: _loadMonth, icon: const Icon(Icons.refresh), label: const Text("Atnaujinti")),
+            monthNav,
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.mood_bad, size: 48, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text("Nėra nuotaikos duomenų",
+                      style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                      onPressed: _loadMonth,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text("Atnaujinti")),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -512,45 +590,126 @@ class _StatisticsPageState extends State<StatisticsPage> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-                Text(DateFormat.yMMMM().format(_currentMonth),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
-              ],
-            ),
-          ),
+          monthNav,
           const SizedBox(height: 16),
           Expanded(
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1,
-                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1)),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30,
-                      getTitlesWidget: (value, meta) => value.toInt() % 5 == 0 ? Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)) : const SizedBox.shrink())),
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 80,
-                      getTitlesWidget: (value, meta) {
-                        const moods = ['😭 Blogai', '😢 Prastai', '😐 Normaliai', '🙂 Gerai', '😀 Puikiai'];
-                        final index = value.toInt() - 1;
-                        return (index >= 0 && index < moods.length) ? Text(moods[index], style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis) : const SizedBox.shrink();
-                      })),
-                ),
-                borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.withOpacity(0.3))),
-                minY: 0, maxY: 5,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots, isCurved: true, color: Colors.yellow[700], barWidth: 3,
-                    dotData: FlDotData(show: true, getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 4, color: Colors.yellow[700]!, strokeWidth: 2, strokeColor: Colors.white)),
-                    belowBarData: BarAreaData(show: true, color: Colors.yellow.withOpacity(0.2)),
+            child: Builder(
+              builder: (context) {
+                final colors = context.colors;
+                final moodColor = Colors.amber[800]!;
+
+                final barGroups = spots
+                    .map(
+                      (spot) => BarChartGroupData(
+                    x: spot.x.toInt(),
+                    barRods: [
+                      BarChartRodData(
+                        toY: spot.y,
+                        width: 6,
+                        color: spot.y > 0 ? moodColor : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                )
+                    .toList();
+
+                return BarChart(
+                    BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        minY: 0,
+                        maxY: 5,
+                        barGroups: barGroups,
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          horizontalInterval: 1,
+                          getDrawingHorizontalLine: (value) => FlLine(
+                            color: Colors.grey.withOpacity(0.2),
+                            strokeWidth: 1,
+                          ),
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border.all(
+                            color: Colors.grey.withOpacity(0.3),
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 30,
+                              getTitlesWidget: (value, meta) {
+                                final day = value.toInt();
+                                final show = day == 1 || day == 5 || day == 10 ||
+                                    day == 15 || day == 20 || day == 25 || day == 30;
+                                return show
+                                    ? Text(
+                                  day.toString(),
+                                  style: const TextStyle(fontSize: 10),
+                                )
+                                    : const SizedBox.shrink();
+                              },
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 80,
+                              interval: 1,
+                              getTitlesWidget: (value, meta) {
+                                const moods = [
+                                  '😭 Blogai',
+                                  '😢 Prastai',
+                                  '😐 Normaliai',
+                                  '🙂 Gerai',
+                                  '😀 Puikiai'
+                                ];
+                                final index = value.toInt() - 1;
+                                return (index >= 0 && index < moods.length)
+                                    ? Text(
+                                  moods[index],
+                                  style: const TextStyle(fontSize: 10),
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                                    : const SizedBox.shrink();
+                              },
+                            ),
+                          ),
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                        ),
+                        barTouchData: BarTouchData(
+                          enabled: true,
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipColor: (_) => colors.background2,
+                            tooltipRoundedRadius: 8,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              const emojis = {
+                                1: '😭',
+                                2: '😢',
+                                3: '😐',
+                                4: '🙂',
+                                5: '😀',
+                              };
+                              final mood = rod.toY.round();
+                              return BarTooltipItem(
+                                  '${emojis[mood] ?? ''} ${rod.toY.toStringAsFixed(1)}',
+                                  TextStyle(
+                                    color: colors.textColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ));
+                            },
+                          ),
+                        )));
+              },
             ),
           ),
         ],

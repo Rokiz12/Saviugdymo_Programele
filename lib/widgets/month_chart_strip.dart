@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../services/theme_notifier.dart';
 import '../theme/app_theme.dart';
 
 class MonthChartStrip extends StatefulWidget {
   final DateTime initialMonth;
+  final DateTime selectedMonth;          // NEW: drives the strip externally
   final ValueChanged<DateTime> onMonthChanged;
   final Map<DateTime, List<double>> dataByMonth;
-
-
   final double maxHeightFraction;
-
-
   final double verticalOffset;
 
   const MonthChartStrip({
     super.key,
     required this.initialMonth,
+    required this.selectedMonth,         // NEW
     required this.onMonthChanged,
     required this.dataByMonth,
     this.maxHeightFraction = 0.9,
@@ -36,7 +33,6 @@ class _MonthChartStripState extends State<MonthChartStrip> {
   void initState() {
     super.initState();
     final now = DateTime.now();
-    // Oldest → newest, left to right (no reverse needed)
     _months = List.generate(12, (i) {
       return DateTime(now.year, now.month - (11 - i));
     });
@@ -58,6 +54,25 @@ class _MonthChartStripState extends State<MonthChartStrip> {
     });
   }
 
+  // NEW: when parent changes selectedMonth (via chevrons), sync the strip
+  @override
+  void didUpdateWidget(covariant MonthChartStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedMonth != widget.selectedMonth) {
+      final newIndex = _months.indexWhere(
+            (m) => m.year == widget.selectedMonth.year &&
+            m.month == widget.selectedMonth.month,
+      );
+      if (newIndex >= 0 && newIndex != _page.round()) {
+        _controller.animateToPage(
+          newIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -71,7 +86,6 @@ class _MonthChartStripState extends State<MonthChartStrip> {
       height: 110,
       child: Stack(
         children: [
-          // Line chart behind pills
           Positioned.fill(
             child: CustomPaint(
               painter: _MonthChartPainter(
@@ -83,7 +97,6 @@ class _MonthChartStripState extends State<MonthChartStrip> {
               ),
             ),
           ),
-          // Month pill pager
           PageView.builder(
             controller: _controller,
             itemCount: _months.length,
@@ -94,12 +107,9 @@ class _MonthChartStripState extends State<MonthChartStrip> {
               return Center(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: active
-                        ? colors.intenseColor
-                        : colors.background2,
+                    color: active ? colors.intenseColor : colors.background2,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -143,12 +153,9 @@ class _MonthChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // The chart is centred on the middle of the strip, then shifted by
-    // verticalOffset. halfSwing is the amplitude above/below that centre.
     final double centre = size.height * (0.5 + verticalOffset);
     final double halfSwing = size.height * maxHeightFraction * 0.5;
 
-    // Gather all (x, y) points across all months
     final allPoints = <Offset>[];
 
     int globalIndex = 0;
@@ -165,8 +172,6 @@ class _MonthChartPainter extends CustomPainter {
         final amp = pow(rawValue.clamp(0.0, 1.0), 0.55).toDouble();
         final t = globalIndex / max(1, totalPoints - 1);
         final x = size.width * t;
-        // amp == 1 → top of swing (centre - halfSwing)
-        // amp == 0 → bottom of swing (centre + halfSwing)
         final y = centre + halfSwing * (1 - 2 * amp);
         allPoints.add(Offset(x, y));
         globalIndex++;
@@ -175,7 +180,6 @@ class _MonthChartPainter extends CustomPainter {
 
     if (allPoints.length < 2) return;
 
-    // Build smooth bezier path
     final path = Path();
     path.moveTo(allPoints[0].dx, allPoints[0].dy);
     for (int i = 1; i < allPoints.length; i++) {
@@ -185,7 +189,6 @@ class _MonthChartPainter extends CustomPainter {
       path.cubicTo(cx, prev.dy, cx, curr.dy, curr.dx, curr.dy);
     }
 
-    // Glow / thick background stroke
     canvas.drawPath(
       path,
       Paint()
@@ -195,7 +198,6 @@ class _MonthChartPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Main line
     canvas.drawPath(
       path,
       Paint()
@@ -205,7 +207,6 @@ class _MonthChartPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Dots — only drawn for the active month
     final int activeMonthIdx = activePage.round().clamp(0, months.length - 1);
     int gi = 0;
     for (int mi = 0; mi < months.length; mi++) {
@@ -215,14 +216,9 @@ class _MonthChartPainter extends CustomPainter {
       for (int vi = 0; vi < values.length; vi++) {
         final pt = allPoints[gi];
         if (mi == activeMonthIdx) {
+          canvas.drawCircle(pt, 5, Paint()..color = const Color(0xFFD4537E));
           canvas.drawCircle(
-            pt,
-            5,
-            Paint()..color = const Color(0xFFD4537E),
-          );
-          canvas.drawCircle(
-            pt,
-            5,
+            pt, 5,
             Paint()
               ..color = Colors.white
               ..style = PaintingStyle.stroke

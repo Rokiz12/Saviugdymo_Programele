@@ -156,5 +156,11 @@ class UserRepository {
 
     return (granted: granted, oldLevel: oldLevel, newLevel: newLevel);
   }
+  Future<void> equipSkin(String userId, String petId, String skinKey) async {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .update({'ownedPets.$petId.equippedSkinKey': skinKey});
+  }
 
 }

@@ -84,16 +84,16 @@ class _CollectionPageState extends State<CollectionPage> {
 
     if (_isLoading) {
       return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(
-          child: CircularProgressIndicator(),
-        ));
-          }
+          padding: EdgeInsets.all(24),
+          child: Center(
+            child: CircularProgressIndicator(),
+          ));
+    }
 
 
 
 
-      if (_error != null) {
+    if (_error != null) {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -142,7 +142,7 @@ class _CollectionPageState extends State<CollectionPage> {
       ),
     );
   }
-  }
+}
 
 Color _rarityColor(String rarity) {
   switch (rarity) {
@@ -292,7 +292,7 @@ class _PetCard extends StatelessWidget {
     final colors = context.colors;
     final duplicateCount = userPet?.duplicateCount ?? 0;
 
-    final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
+    final imageKey = context.colors.petImageKey;
 
     final imageUrl = pet.images[imageKey] ??
         pet.images.values.firstOrNull ??
@@ -302,10 +302,10 @@ class _PetCard extends StatelessWidget {
       onTap: () => _openPopup(context),
       child: Container(
         decoration: BoxDecoration(
-          color: isOwned ? colors.background2 : Colors.grey.shade100,
+          color: colors.background2,
           border: Border.all(
-            color: isOwned ? rarityColor : Colors.grey.shade300,
-            width: isOwned ? 2 : 1,
+            color: rarityColor,
+            width: 2,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -325,18 +325,18 @@ class _PetCard extends StatelessWidget {
                     0,      0,      0,      1, 0,
                   ]),
                   child: imageUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) =>
-                            const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                        errorWidget: (context, url, error) =>
-                            Icon(Icons.pets,
-                                size: 40,
-                                color: colors.background2),
-                      )
+                      ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) =>
+                    const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    errorWidget: (context, url, error) =>
+                        Icon(Icons.pets,
+                            size: 40,
+                            color: colors.background2),
+                  )
                       : Icon(Icons.pets,
                       size: 40, color: colors.background2),
                 ),
@@ -409,8 +409,8 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
         case 'Worm':
           SoundService.playWorm();
           break;
-          default:
-            break;
+        default:
+          break;
       }
 
 
@@ -441,14 +441,17 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-
     final duplicateCount = widget.userPet?.duplicateCount ?? 0;
-    final imageKey = duplicateCount >= 10 ? 'Skin' : 'collection';
+
+    final imageKey = context.colors.petImageKey;
+
     final imageUrl = widget.pet.images[imageKey] ??
-        widget.pet.images.values.firstOrNull ?? '';
+        widget.pet.images.values.firstOrNull ??
+        '';
+
     final screenHeight = MediaQuery.of(context).size.height;
 
-    String buildLore(Map<String, dynamic> lore, int currentLevel) {
+    String _buildLore(Map<String, dynamic> lore, int currentLevel) {
       final parts = <String>[];
       for (int i = 1; i <= currentLevel; i++) {
         final part = lore['level_$i'];
@@ -461,11 +464,10 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
       height: screenHeight * 0.75,
       decoration: BoxDecoration(
         color: colors.background2,
-
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(
           top: BorderSide(
-            color: widget.isOwned ? widget.rarityColor : colors.background,
+            color: widget.rarityColor,
             width: 3,
           ),
         ),
@@ -479,7 +481,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: colors.primary,
+                color: widget.rarityColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -491,7 +493,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Pet image
                   Container(
                     width: 140,
                     height: 140,
@@ -499,7 +500,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                       color: colors.background2,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: widget.isOwned ? widget.rarityColor : colors.background,
+                        color: widget.rarityColor,
                         width: 2,
                       ),
                       boxShadow: [
@@ -516,7 +517,8 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                       borderRadius: BorderRadius.circular(14),
                       child: ColorFiltered(
                         colorFilter: widget.isOwned
-                            ? const ColorFilter.mode(Colors.transparent, BlendMode.dst)
+                            ? const ColorFilter.mode(
+                            Colors.transparent, BlendMode.dst)
                             : const ColorFilter.matrix(<double>[
                           0.2126, 0.7152, 0.0722, 0, 0,
                           0.2126, 0.7152, 0.0722, 0, 0,
@@ -527,20 +529,23 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                             ? CachedNetworkImage(
                           imageUrl: imageUrl,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => const Center(
+                          placeholder: (context, url) =>
+                          const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                           errorWidget: (context, url, error) =>
-                              Icon(Icons.pets, size: 40, color: colors.appBarUnpickedColor),
+                              Icon(Icons.pets,
+                                  size: 40,
+                                  color: Colors.grey.shade400),
                         )
-                            : Icon(Icons.pets, size: 60, color: colors.appBarUnpickedColor),
+                            : Icon(Icons.pets,
+                            size: 60, color: Colors.grey.shade400),
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Pet name
                   Text(
                     widget.isOwned ? widget.pet.name : '???',
                     style: TextStyle(
@@ -553,16 +558,16 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
                   const SizedBox(height: 6),
 
-                  // Rarity chip
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: widget.isOwned
                           ? widget.rarityColor.withValues(alpha: 0.15)
                           : colors.background2,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: widget.isOwned ? widget.rarityColor : colors.appBarUnpickedColor,
+                        color: widget.rarityColor,
                       ),
                     ),
                     child: Text(
@@ -570,14 +575,13 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: widget.isOwned ? widget.rarityColor : colors.appBarUnpickedColor,
+                        color: widget.rarityColor,
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 20),
 
-                  // Level / XP chips
                   if (widget.isOwned && widget.userPet != null) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -601,7 +605,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                   Divider(color: colors.appBarUnpickedColor.withValues(alpha: 0.3)),
                   const SizedBox(height: 12),
 
-                  // Lore section
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -614,7 +617,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
                   if (!widget.isOwned)
                     Text(
                       'Unlock this pet to reveal its secrets...',
@@ -638,7 +640,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                         children: [
                           if (widget.userPet!.level > 1)
                             TextSpan(
-                              text: buildLore(widget.pet.lore, widget.userPet!.level - 1) + '\n\n',
+                              text: _buildLore(widget.pet.lore, widget.userPet!.level - 1) + '\n\n',
                             ),
                           TextSpan(
                             text: widget.pet.lore['level_${widget.userPet!.level}'] ?? '',
@@ -655,7 +657,6 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
 
                   const SizedBox(height: 28),
 
-                  // Equip button
                   if (widget.isOwned)
                     widget.equippedPetId == widget.pet.id
                         ? Container(
@@ -695,7 +696,8 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: colors.background2),
+                              strokeWidth: 2, color: colors.background2
+                          ),
                         )
                             : const Icon(Icons.check_circle_outline),
                         label: Text(_isEquipping ? 'Equipping...' : 'Equip'),
@@ -711,6 +713,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+
                       ),
                     ),
                 ],
@@ -721,8 +724,7 @@ class _PetDetailSheetState extends State<_PetDetailSheet> {
       ),
     );
   }
-  }
-
+}
 
 class _StatChip extends StatelessWidget {
   final String label;

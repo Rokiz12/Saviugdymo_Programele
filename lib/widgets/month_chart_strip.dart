@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../services/theme_notifier.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import '../theme/app_theme.dart';
+import '../services/language_notifier.dart';
 
 class MonthChartStrip extends StatefulWidget {
   final DateTime initialMonth;
@@ -13,6 +16,7 @@ class MonthChartStrip extends StatefulWidget {
 
 
   final double verticalOffset;
+  final bool showPills;
 
   const MonthChartStrip({
     super.key,
@@ -21,6 +25,7 @@ class MonthChartStrip extends StatefulWidget {
     required this.dataByMonth,
     this.maxHeightFraction = 0.9,
     this.verticalOffset = -0.15,
+    this.showPills = true,
   });
 
   @override
@@ -83,47 +88,47 @@ class _MonthChartStripState extends State<MonthChartStrip> {
               ),
             ),
           ),
-          // Month pill pager
-          PageView.builder(
-            controller: _controller,
-            itemCount: _months.length,
-            onPageChanged: (i) => widget.onMonthChanged(_months[i]),
-            itemBuilder: (context, index) {
-              final month = _months[index];
-              final active = (_page.round() == index);
-              return Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? colors.intenseColor
-                        : colors.background2,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _label(month),
-                    style: TextStyle(
-                      color: colors.textColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+          // Optional month pill pager (can be hidden to avoid duplicate controls)
+          if (widget.showPills)
+            PageView.builder(
+              controller: _controller,
+              itemCount: _months.length,
+              onPageChanged: (i) => widget.onMonthChanged(_months[i]),
+              itemBuilder: (context, index) {
+                final month = _months[index];
+                final active = (_page.round() == index);
+                final lang = context.watch<LanguageNotifier>();
+                final locale = lang.language == AppLanguage.lt ? 'lt' : 'en';
+                final label = DateFormat.MMM(locale).format(DateTime(month.year, month.month));
+                return Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? colors.intenseColor
+                          : colors.background2,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: colors.textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
         ],
       ),
     );
   }
 
-  String _label(DateTime d) {
-    const m = ['Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'];
-    return m[d.month - 1];
-  }
+  // labels are produced using Intl.DateFormat in the builder to support localization
 }
 
 class _MonthChartPainter extends CustomPainter {

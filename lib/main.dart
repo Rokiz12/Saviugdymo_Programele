@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'pages/combined_avatar_and_collection.dart';
 import 'pages/diary.dart';
@@ -21,6 +22,10 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize date formatting data for Lithuanian and English so DateFormat
+  // can produce localized month names.
+  await initializeDateFormatting('lt');
+  await initializeDateFormatting('en');
   await Firebase.initializeApp();
   preloadPetImages();
   runApp(

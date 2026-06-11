@@ -342,6 +342,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
       int firstWeekday, int totalCells) {
     final colors = context.colors;
     final lang = context.watch<LanguageNotifier>();
+    final locale = lang.language == AppLanguage.lt ? 'lt' : 'en';
     final best = _computeBestMonth();
 
     // Stats across the historical window (excluding current month)
@@ -392,6 +393,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
           MonthChartStrip(
             initialMonth: _currentMonth,
             dataByMonth: _buildMonthChartData(),
+            showPills: false,
             onMonthChanged: (m) {
               setState(() => _currentMonth = m);
               _loadMonth();
@@ -406,7 +408,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-                Text(DateFormat.yMMMM().format(_currentMonth),
+                Text(DateFormat.yMMMM(locale).format(_currentMonth),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
               ],
@@ -470,7 +472,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
           if (best != null)
             BestMonthCard(
-              monthName: DateFormat.yMMMM().format(best.month),
+              monthName: DateFormat.yMMMM(locale).format(best.month),
               completionRate: best.completionRate,
               completedDays: best.completedDays,
               totalDays: best.totalDays,
@@ -489,6 +491,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   Widget _buildMoodTab() {
     final lang = context.watch<LanguageNotifier>();
+    final locale = lang.language == AppLanguage.lt ? 'lt' : 'en';
     final spots = _buildMoodChartData();
     if (spots.isEmpty || spots.every((spot) => spot.y == 0)) {
       return Center(
@@ -517,7 +520,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-                Text(DateFormat.yMMMM().format(_currentMonth),
+                Text(DateFormat.yMMMM(locale).format(_currentMonth),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
               ],

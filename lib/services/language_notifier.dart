@@ -131,6 +131,20 @@ class LanguageNotifier extends ChangeNotifier {
 
     'no_mood_data': {AppLanguage.lt: 'Nėra šio mėnesio nuotaikos duomenų', AppLanguage.en: 'No mood data for this month'},
 
+    // Best month / statistics labels
+    'best_month': {AppLanguage.lt: 'GERIAUSIAS MĖNUO', AppLanguage.en: 'BEST MONTH'},
+    'done': {AppLanguage.lt: 'Užbaigta', AppLanguage.en: 'done'},
+    'completed': {AppLanguage.lt: 'užbaigta', AppLanguage.en: 'completed'},
+    'highest_rate_desc': {AppLanguage.lt: 'Tavo aukščiausias rodiklis tarp visų mėnesių', AppLanguage.en: 'Your highest rate\nacross all months'},
+    'days_completed': {AppLanguage.lt: 'Užbaigtos dienos', AppLanguage.en: 'days completed'},
+    'longest_streak': {AppLanguage.lt: 'Ilgiausia serija', AppLanguage.en: 'longest streak'},
+    'habits_logged': {AppLanguage.lt: 'Užfiksuoti įpročiai', AppLanguage.en: 'habits logged'},
+    'goals_on_track': {AppLanguage.lt: 'Tikslai tvarkoje', AppLanguage.en: 'goals on track'},
+    'vs_monthly_average': {AppLanguage.lt: 'Prie mėnesio vidurkio', AppLanguage.en: 'vs. monthly average'},
+    'better_than': {AppLanguage.lt: 'Geresnis nei', AppLanguage.en: 'Better than '},
+    'of': {AppLanguage.lt: 'iš', AppLanguage.en: 'of'},
+    'months': {AppLanguage.lt: 'mėnesių', AppLanguage.en: 'months'},
+
     //'premium_title': {AppLanguage.lt: '66 dienų premium', AppLanguage.en: '66 days premium'},
     'premium_desc': {AppLanguage.lt: 'Neriboti įrašai, nuotraukos ir išsami statistika.', AppLanguage.en: 'Unlimited entries, photos and detailed statistics.'},
     'get': {AppLanguage.lt: 'Gauti', AppLanguage.en: 'Get'},

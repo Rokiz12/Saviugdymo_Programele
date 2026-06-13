@@ -92,7 +92,10 @@ class _HabitsPageState extends State<HabitsPage> {
     if (stepHabits.isEmpty) return;
 
     final steps = await StepService.getTodaySteps();
-    if (steps == null) return; // permission denied or read failed — silent, try again next launch
+    if (steps == null) return;
+    if (!mounted) return;
+
+
 
     // Keep for live display in the row
     if (mounted) setState(() => _todaySteps = steps);
@@ -109,6 +112,9 @@ class _HabitsPageState extends State<HabitsPage> {
 
   /// Persists the step count into the DayLog and optionally marks it done.
   void _saveStepValue(Habit h, int steps, {required bool markDone}) {
+    if (!mounted) return;          // 👈 add this
+
+
     final now    = DateTime.now().toUtc();
     final logDay = DateTime.utc(now.year, now.month, now.day);
 
@@ -364,6 +370,8 @@ class _HabitsPageState extends State<HabitsPage> {
 
     if (!_habits.any((h) => h.id == auto.id)) {
       await _repo.addHabit(userId: widget.userId, habit: auto);
+      if (!mounted) return;          // 👈 add this
+
       setState(() => _habits.add(auto));
     }
   }

@@ -15,6 +15,8 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final themeNotifier = context.read<ThemeNotifier>();
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -51,13 +53,17 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.light_mode,
                 title: "Šviesi",
                 isSelected: themeNotifier.mode == AppMode.light,
-                onTap: () => themeNotifier.setMode(AppMode.light),
+                onTap: () {
+                  if (userId != null) themeNotifier.setMode(userId, AppMode.light);
+                },
               ),
               _SettingsRadioTile(
                 icon: Icons.dark_mode,
                 title: "Tamsi",
                 isSelected: themeNotifier.mode == AppMode.dark,
-                onTap: () => themeNotifier.setMode(AppMode.dark),
+                onTap: () {
+                  if (userId != null) themeNotifier.setMode(userId, AppMode.dark);
+                },
               ),
             ],
           ),

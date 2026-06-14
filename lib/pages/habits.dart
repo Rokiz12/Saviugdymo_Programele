@@ -82,23 +82,35 @@ class _HabitsPageState extends State<HabitsPage> {
 
     final steps = await StepService.getTodaySteps();
     if (steps == null) return;
+    if (!mounted) return;
 
+
+
+    // Keep for live display in the row
     if (mounted) setState(() => _todaySteps = steps);
 
+    // Save step count and mark complete when goal is reached
     for (final h in stepHabits) {
       final goal   = h.stepGoal ?? 0;
       final isDone = steps >= goal && goal > 0;
+
+      // Always write the step count so the progress bar stays current
       _saveStepValue(h, steps, markDone: isDone);
     }
   }
 
+  /// Persists the step count into the DayLog and optionally marks it done.
   void _saveStepValue(Habit h, int steps, {required bool markDone}) {
+    if (!mounted) return;          // 👈 add this
+
+
     final now    = DateTime.now().toUtc();
     final logDay = DateTime.utc(now.year, now.month, now.day);
 
     DayLog log = _today ?? DayLog(dateUtc: logDay, entries: {});
     log = log.setValue(h.id, NumberValue(steps));
 
+    // ── keep _monthLogs in sync so goal progress reads the same value ──
     final idx = _monthLogs.indexWhere(
           (l) =>
       l.dateUtc.year  == logDay.year &&
@@ -117,8 +129,11 @@ class _HabitsPageState extends State<HabitsPage> {
     });
 
     _repo.upsertDayLog(userId: widget.userId, log: log);
+
     if (markDone) SoundService.playMarkHabit();
   }
+
+  // ─── GOAL PROGRESS ──────────────────────────────────────────────────────────
 
   int _calculateGoalProgress(Goal g) {
     final habitId = g.habbitID;
@@ -130,19 +145,23 @@ class _HabitsPageState extends State<HabitsPage> {
     switch (g.period) {
       case GoalPeriod.day:
         return goalValueOf(_today?.entries[habitId], habit);
+
       case GoalPeriod.week:
         return _monthLogs
             .where((log) => _isInCurrentWeek(log.dateUtc))
             .map((log) => goalValueOf(log.entries[habitId], habit))
             .fold(0, (a, b) => a + b);
+
       case GoalPeriod.month:
         return _monthLogs
             .map((log) => goalValueOf(log.entries[habitId], habit))
             .fold(0, (a, b) => a + b);
+
       case GoalPeriod.year:
         return _monthLogs
             .map((log) => goalValueOf(log.entries[habitId], habit))
             .fold(0, (a, b) => a + b);
+
       case GoalPeriod.custom:
         final days  = g.customDays ?? 1;
         final start = DateTime.now().toUtc().subtract(Duration(days: days));
@@ -161,6 +180,8 @@ class _HabitsPageState extends State<HabitsPage> {
         d.isBefore(sunday.add(const Duration(days: 1)));
   }
 
+  // ─── HABITS CRUD ────────────────────────────────────────────────────────────
+
   Future<void> _addHabit() async {
     final habit = await showDialog<Habit>(
       context: context,
@@ -174,6 +195,7 @@ class _HabitsPageState extends State<HabitsPage> {
     final initVal = _initialValueFor(habit);
     if (initVal != null) _setValue(habit, initVal);
 
+    // If a step habit was just created, sync immediately
     if (habit.kind == RatingKind.steps) await _syncStepHabits();
   }
 
@@ -229,6 +251,8 @@ class _HabitsPageState extends State<HabitsPage> {
     });
   }
 
+  // ─── GOALS CRUD ─────────────────────────────────────────────────────────────
+
   Future<void> _addGoal() async {
     final goal = await showDialog<Goal>(
       context: context,
@@ -280,6 +304,8 @@ class _HabitsPageState extends State<HabitsPage> {
     setState(() => _goals.removeWhere((x) => x.id == g.id));
   }
 
+  // ─── HABIT VALUE HANDLING ───────────────────────────────────────────────────
+
   RatingValue? _initialValueFor(Habit h) {
     switch (h.kind) {
       case RatingKind.checkbox:
@@ -301,6 +327,7 @@ class _HabitsPageState extends State<HabitsPage> {
     switch (h.kind) {
       case RatingKind.checkbox:
         return v is BoolValue ? v : const BoolValue(false);
+
       case RatingKind.number:
         if (v is NumberValue) {
           final min = h.min ?? -999999;
@@ -308,15 +335,18 @@ class _HabitsPageState extends State<HabitsPage> {
           return NumberValue(v.value.clamp(min, max));
         }
         return NumberValue(h.min ?? 0);
+
       case RatingKind.scale:
         final min = h.min ?? 1;
         final max = h.max ?? 5;
         if (v is NumberValue) return NumberValue(v.value.clamp(min, max));
         return NumberValue(min);
+
       case RatingKind.enumerator:
         final opts = h.options ?? const [];
         if (v is EnumValue && opts.contains(v.option)) return v;
         return opts.isNotEmpty ? EnumValue(opts.first) : null;
+
       case RatingKind.steps:
         return v is NumberValue ? v : const NumberValue(0);
     }
@@ -333,6 +363,8 @@ class _HabitsPageState extends State<HabitsPage> {
     _repo.upsertDayLog(userId: widget.userId, log: newLog);
   }
 
+  // ─── AUTO HABIT TRACKER ─────────────────────────────────────────────────────
+
   Future<void> _ensureAutoHabitExists() async {
     const auto = Habit(
       id: 'app2min',
@@ -343,6 +375,8 @@ class _HabitsPageState extends State<HabitsPage> {
 
     if (!_habits.any((h) => h.id == auto.id)) {
       await _repo.addHabit(userId: widget.userId, habit: auto);
+      if (!mounted) return;          // 👈 add this
+
       setState(() => _habits.add(auto));
     }
   }
@@ -352,6 +386,8 @@ class _HabitsPageState extends State<HabitsPage> {
     _tracker?.stop();
     super.dispose();
   }
+
+  // ─── UI ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -376,6 +412,9 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
+
+// ─── FAB ADD BUTTON ──────────────────────────────────────────────────────────
+
   Widget _fabAdd(VoidCallback onTap) {
     final colors = context.colors;
 
@@ -394,6 +433,8 @@ class _HabitsPageState extends State<HabitsPage> {
       ),
     );
   }
+
+// ─── HABITS SECTION ──────────────────────────────────────────────────────────
 
   Widget _buildHabitsSection() {
     final colors = context.colors;
@@ -449,6 +490,8 @@ class _HabitsPageState extends State<HabitsPage> {
       ],
     );
   }
+
+// ─── GOALS SECTION ───────────────────────────────────────────────────────────
 
   Widget _buildGoalsSection() {
     final colors = context.colors;
@@ -517,12 +560,16 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
+  // ─── HABIT TRAILING WIDGET ──────────────────────────────────────────────────
+
   Widget _buildTrailingFor(Habit h, RatingValue? v) {
     final lang = context.read<LanguageNotifier>();
 
     switch (h.kind) {
+
       case RatingKind.checkbox:
         final checked = (v is BoolValue) ? v.value : false;
+
         if (h.systemOnly) {
           return IgnorePointer(child: Checkbox(value: checked, onChanged: null));
         }
@@ -533,6 +580,7 @@ class _HabitsPageState extends State<HabitsPage> {
 
       case RatingKind.number:
         final numVal = (v is NumberValue) ? v.value : (h.min ?? 0);
+
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -571,6 +619,7 @@ class _HabitsPageState extends State<HabitsPage> {
         final min     = h.min ?? 1;
         final max     = h.max ?? 5;
         final current = (v is NumberValue) ? v.value.toDouble() : min.toDouble();
+
         return SizedBox(
           width: 160,
           child: Row(
@@ -593,6 +642,7 @@ class _HabitsPageState extends State<HabitsPage> {
       case RatingKind.enumerator:
         final options  = h.options ?? const ["A", "B", "C"];
         final selected = (v is EnumValue) ? v.option : null;
+
         return DropdownButton<String>(
           value: options.contains(selected) ? selected : null,
           hint: Text(lang.t('select_hint')),
@@ -604,6 +654,7 @@ class _HabitsPageState extends State<HabitsPage> {
           },
         );
 
+    // ── Steps trailing widget ──────────────────────────────────────────────
       case RatingKind.steps:
         final goal    = h.stepGoal ?? 0;
         final steps   = _todaySteps;

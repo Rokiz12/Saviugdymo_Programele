@@ -49,28 +49,28 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeNotifier = context.watch<ThemeNotifier>();
-
-    return MaterialApp(
-      theme: AppTheme.of(themeNotifier.mode),
-      debugShowCheckedModeBanner: false,
-
-      routes:{
-        '/settings':(context) => SettingsPage(),
+    return Consumer<ThemeNotifier>(
+      builder: (context, themeNotifier, _) {
+        return MaterialApp(
+          theme: AppTheme.of(themeNotifier.mode),
+          debugShowCheckedModeBanner: false,
+          routes: {
+            '/settings': (context) => SettingsPage(),
+          },
+          home: StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+              if (snapshot.hasData) {
+                return MainScreen(key: ValueKey(snapshot.data!.uid), userId: snapshot.data!.uid);
+              }
+              return const LoginPage();
+            },
+          ),
+        );
       },
-
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          if (snapshot.hasData) {
-            return MainScreen(userId: snapshot.data!.uid);
-          }
-          return const LoginPage();
-        },
-      ),
     );
   }
 }
@@ -117,6 +117,9 @@ class _MainScreenState extends State<MainScreen>
       _rewardNotifier = context.read<RewardNotifier>();
       _rewardNotifier.addListener(_onRewardChanged);
       _checkDailyReward();
+
+      context.read<ThemeNotifier>().loadFromDb(widget.userId);
+
     });
 
     _startTracker();

@@ -4,6 +4,7 @@ import 'questionaire.dart';
 import '../widgets/custom_app_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/theme_notifier.dart';
+import '../services/language_notifier.dart';
 import '../theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -15,29 +16,23 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final themeNotifier = context.read<ThemeNotifier>();
+    final lang = context.watch<LanguageNotifier>();
 
     return Scaffold(
       backgroundColor: colors.background,
-      appBar: const CustomAppBar(title: "Nustatymai"),
+      appBar: CustomAppBar(title: lang.t('settings_title')),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12),
         children: [
           // PROFILIS
           _SettingsCard(
-            title: "Profilis",
+            title: lang.t('profile_title'),
             children: [
-              _SettingsTile(
-                icon: Icons.person,
-                iconColor: Colors.yellow,
-                title: "Vardas",
-                subtitle: "Vartotojas",
-                onTap: () {},
-              ),
               _SettingsTile(
                 icon: Icons.email,
                 iconColor: colors.intenseColor,
-                title: "El. paštas",
-                subtitle: FirebaseAuth.instance.currentUser?.email ?? "Nėra el. pašto",
+                title: lang.t('email_label'),
+                subtitle: FirebaseAuth.instance.currentUser?.email ?? lang.t('no'),
                 onTap: () {},
               ),
             ],
@@ -45,17 +40,17 @@ class SettingsPage extends StatelessWidget {
 
           // TEMA
           _SettingsCard(
-            title: "Tema",
+            title: lang.t('theme_title'),
             children: [
               _SettingsRadioTile(
                 icon: Icons.light_mode,
-                title: "Šviesi",
+                title: lang.t('theme_light'),
                 isSelected: themeNotifier.mode == AppMode.light,
                 onTap: () => themeNotifier.setMode(AppMode.light),
               ),
               _SettingsRadioTile(
                 icon: Icons.dark_mode,
-                title: "Tamsi",
+                title: lang.t('theme_dark'),
                 isSelected: themeNotifier.mode == AppMode.dark,
                 onTap: () => themeNotifier.setMode(AppMode.dark),
               ),
@@ -64,32 +59,32 @@ class SettingsPage extends StatelessWidget {
 
           // KALBA
           _SettingsCard(
-            title: "Kalba",
+            title: lang.t('language_title'),
             children: [
               _SettingsRadioTile(
                 icon: Icons.translate,
-                title: "Lietuvių",
-                isSelected: true,
-                onTap: () {},
+                title: lang.t('lang_lt'),
+                isSelected: lang.language == AppLanguage.lt,
+                onTap: () => lang.setLanguage(AppLanguage.lt),
               ),
               _SettingsRadioTile(
                 icon: Icons.translate,
-                title: "Anglų",
-                isSelected: false,
-                onTap: () {},
+                title: lang.t('lang_en'),
+                isSelected: lang.language == AppLanguage.en,
+                onTap: () => lang.setLanguage(AppLanguage.en),
               ),
             ],
           ),
 
           // PRENUMERATA
           _SettingsCard(
-            title: "Prenumerata",
+            title: lang.t('premium_title'),
             children: [
               _SettingsTile(
                 icon: Icons.star,
                 iconColor: colors.primary,
-                title: "Premium",
-                subtitle: "Neaktyvi",
+                title: lang.t('premium_title'),
+                subtitle: lang.t('premium_activated_false'),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
@@ -108,12 +103,12 @@ class SettingsPage extends StatelessWidget {
 
           // PASKYRA
           _SettingsCard(
-            title: "Paskyra",
+            title: lang.t('account_title'),
             children: [
               _SettingsTile(
                 icon: Icons.quiz,
                 iconColor: Colors.red,
-                title: "Perdaryti norų klausimyną",
+                title: lang.t('redo_questionnaire'),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -127,7 +122,7 @@ class SettingsPage extends StatelessWidget {
               _SettingsTile(
                 icon: Icons.logout,
                 iconColor: Colors.red,
-                title: "Atsijungti",
+                title: lang.t('logout'),
                 onTap: () async {
                   await AuthService.signOut();
                   Navigator.pushReplacementNamed(context, '/login');
@@ -137,23 +132,22 @@ class SettingsPage extends StatelessWidget {
               _SettingsTile(
                 icon: Icons.delete_forever,
                 iconColor: Colors.red,
-                title: "Ištrinti paskyrą",
+                title: lang.t('delete_account'),
                 onTap: () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (_) => AlertDialog(
-                      title: const Text("Ištrinti paskyrą?"),
-                      content: const Text(
-                          "Tai negrįžtamai ištrins jūsų paskyrą ir visus duomenis."),
+                      title: Text(lang.t('delete_confirm_title')),
+                      content: Text(lang.t('delete_confirm_text')),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text("Atšaukti"),
+                          child: Text(lang.t('cancel')),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text(
-                            "Ištrinti",
+                          child: Text(
+                            lang.t('delete'),
                             style: TextStyle(color: Colors.red),
                           ),
                         ),
@@ -169,9 +163,8 @@ class SettingsPage extends StatelessWidget {
                   } on FirebaseAuthException catch (e) {
                     if (e.code == 'requires-recent-login') {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              "Prisijunkite iš naujo prieš trinant paskyrą."),
+                        SnackBar(
+                          content: Text(lang.t('recent_login_required')),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -186,7 +179,7 @@ class SettingsPage extends StatelessWidget {
 
           Center(
             child: Text(
-              'Version 1.0.0',
+              '${lang.t('version')} 1.0.0',
               style: TextStyle(color: colors.textColor, fontSize: 12),
             ),
           ),

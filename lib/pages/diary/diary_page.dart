@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../services/language_notifier.dart';
 import 'diary_provider.dart';
 import 'new_entry_tab.dart';
 import 'calendar_tab.dart';
@@ -13,6 +14,7 @@ class DiaryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     return ChangeNotifierProvider(
       create: (_) => DiaryProvider(),
@@ -21,15 +23,15 @@ class DiaryPage extends StatelessWidget {
         child: Scaffold(
           backgroundColor: colors.background,
           appBar: CustomAppBar(
-            title: 'Dienoraštis',
+            title: lang.t('nav_diary'),
             bottom: TabBar(
               indicatorColor: colors.intenseColor,
               labelColor: colors.textColor,
               unselectedLabelColor: colors.appBarUnpickedColor,
-              tabs: const [
-                Tab(icon: Icon(Icons.add), text: "Naujas"),
-                Tab(icon: Icon(Icons.calendar_month), text: "Kalendorius"),
-                Tab(icon: Icon(Icons.photo_library), text: "Prisiminimai"),
+              tabs: [
+                Tab(icon: const Icon(Icons.add), text: lang.t('diary_new')),
+                Tab(icon: const Icon(Icons.calendar_month), text: lang.t('diary_calendar')),
+                Tab(icon: const Icon(Icons.photo_library), text: lang.t('diary_memories')),
               ],
             ),
           ),

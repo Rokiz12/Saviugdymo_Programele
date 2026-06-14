@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../services/language_notifier.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../data/repositories/user_repository.dart';
 import '../features/habits/data/HabitRepository.dart';
@@ -10,6 +12,7 @@ import '../data/models/diary_entry_model.dart';
 import '../widgets/best_month_card.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_app_bar.dart';
+
 
 
 class _MonthStats {
@@ -328,6 +331,7 @@ class _StatisticsPageState extends State<StatisticsPage>
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     // FIX 3: Only show full-page spinner on the very first load
     if (_initialLoad) {
@@ -344,15 +348,15 @@ class _StatisticsPageState extends State<StatisticsPage>
     return Scaffold(
       // FIX 2: Pass explicit _tabController so switching months doesn't reset the tab
       appBar: CustomAppBar(
-        title: 'Statistika',
+        title: lang.t('statistics'),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: colors.intenseColor,
           labelColor: colors.textColor,
           unselectedLabelColor: colors.appBarUnpickedColor,
-          tabs: const [
-            Tab(icon: Icon(Icons.check_circle), text: "Įpročiai"),
-            Tab(icon: Icon(Icons.mood), text: "Nuotaika"),
+          tabs: [
+            Tab(icon: Icon(Icons.check_circle), text: lang.t('habits')),
+            Tab(icon: Icon(Icons.mood), text: lang.t('mood')),
           ],
         ),
       ),
@@ -384,6 +388,7 @@ class _StatisticsPageState extends State<StatisticsPage>
   Widget _buildHabitsTab(DateTime firstDayOfMonth, int daysInMonth,
       int firstWeekday, int totalCells) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     final best = _computeBestMonth();
 
@@ -432,15 +437,6 @@ class _StatisticsPageState extends State<StatisticsPage>
       padding: const EdgeInsets.only(bottom: 32),
       child: Column(
         children: [
-          MonthChartStrip(
-            initialMonth: _currentMonth,
-            selectedMonth: _currentMonth,
-            dataByMonth: _buildMonthChartData(),
-            onMonthChanged: (m) {
-              setState(() => _currentMonth = m);
-              _loadMonth();
-            },
-          ),
 
           const SizedBox(height: 8),
 
@@ -451,7 +447,7 @@ class _StatisticsPageState extends State<StatisticsPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-                Text(DateFormat.yMMMM().format(_currentMonth),
+                 Text(DateFormat.yMMMM(lang.locale).format(_currentMonth),
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(
                   icon: Icon(
@@ -464,12 +460,17 @@ class _StatisticsPageState extends State<StatisticsPage>
             ),
           ),
 
-          Padding(
+            Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
-              children: const [
-                _Weekday("Pr"), _Weekday("An"), _Weekday("Tr"),
-                _Weekday("Kt"), _Weekday("Pn"), _Weekday("Št"), _Weekday("Sk"),
+              children:  [
+                _Weekday(lang.t('mon_short')),
+                _Weekday(lang.t('tue_short')),
+                _Weekday(lang.t('wed_short')),
+                _Weekday(lang.t('thu_short')),
+                _Weekday(lang.t('fri_short')),
+                _Weekday(lang.t('sat_short')),
+                _Weekday(lang.t('sun_short')),
               ],
             ),
           ),
@@ -517,7 +518,7 @@ class _StatisticsPageState extends State<StatisticsPage>
           ],
           if (best != null)
             BestMonthCard(
-              monthName: DateFormat.yMMMM().format(best.month),
+              monthName: DateFormat.yMMMM(lang.locale).format(best.month),
               completionRate: best.completionRate,
               completedDays: best.completedDays,
               totalDays: best.totalDays,
@@ -536,6 +537,7 @@ class _StatisticsPageState extends State<StatisticsPage>
 
   Widget _buildMoodTab() {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
     final spots = _buildMoodChartData();
     final hasData = spots.any((spot) => spot.y > 0);
 
@@ -546,7 +548,7 @@ class _StatisticsPageState extends State<StatisticsPage>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(icon: const Icon(Icons.chevron_left), onPressed: _prevMonth),
-          Text(DateFormat.yMMMM().format(_currentMonth),
+          Text(DateFormat.yMMMM(lang.locale).format(_currentMonth),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           IconButton(
             icon: Icon(
@@ -571,13 +573,13 @@ class _StatisticsPageState extends State<StatisticsPage>
                 children: [
                   const Icon(Icons.mood_bad, size: 48, color: Colors.grey),
                   const SizedBox(height: 16),
-                  const Text("Nėra nuotaikos duomenų",
+                  Text(lang.t('no_mood_data'),
                       style: TextStyle(fontSize: 16, color: Colors.grey)),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                       onPressed: _loadMonth,
                       icon: const Icon(Icons.refresh),
-                      label: const Text("Atnaujinti")),
+                      label: Text(lang.t('retry'))),
                 ],
               ),
             ),
@@ -660,12 +662,12 @@ class _StatisticsPageState extends State<StatisticsPage>
                               reservedSize: 80,
                               interval: 1,
                               getTitlesWidget: (value, meta) {
-                                const moods = [
-                                  '😭 Blogai',
-                                  '😢 Prastai',
-                                  '😐 Normaliai',
-                                  '🙂 Gerai',
-                                  '😀 Puikiai'
+                                final moods = [
+                                  lang.t('mood_bad'),
+                                  lang.t('mood_poor'),
+                                  lang.t('mood_normal'),
+                                  lang.t('mood_good'),
+                                  lang.t('mood_great'),
                                 ];
                                 final index = value.toInt() - 1;
                                 return (index >= 0 && index < moods.length)
@@ -734,6 +736,7 @@ class _PremiumBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -757,13 +760,13 @@ class _PremiumBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '66 days premium',
+                Text(
+                  lang.t('premium_title'),
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
-                const SizedBox(height: 3),
+                SizedBox(height: 3),
                 Text(
-                  'Neriboti įrašai, nuotraukos ir išsami statistika.',
+                  lang.t('premium_desc'),
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
@@ -780,8 +783,8 @@ class _PremiumBanner extends StatelessWidget {
                 color: colors.intenseColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text(
-                'Gauti',
+              child: Text(
+                lang.t('get'),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,

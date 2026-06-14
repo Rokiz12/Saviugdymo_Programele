@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../data/models/user_model.dart';
 import '../data/models/pet_model.dart';
 import '../data/repositories/user_repository.dart';
@@ -10,6 +11,7 @@ import "package:cached_network_image/cached_network_image.dart";
 import '../data/repositories/quote_repository.dart';
 import '../theme/app_theme.dart';
 import '../data/models/user_pet_progress.dart';
+import '../services/language_notifier.dart';
 
 class AvatarPage extends StatefulWidget {
   final String userId;
@@ -29,18 +31,15 @@ class _AvatarPageState extends State<AvatarPage>
   late Animation<double> _floatingAnimation;
   double _avatarScale = 1.0;
 
-
   StreamSubscription? _userSubscription;
   UserModel? _user;
 
-  // pet cache to avoid loading flash
   PetModel? _cachedPet;
   String _cachedPetId = '';
   Future<PetModel?>? _petFuture;
 
   bool _isLoading = true;
 
-  // speech bubble state
   List<String> _quotes = [];
   String _currentQuote = '';
   bool _bubbleVisible = false;
@@ -63,7 +62,6 @@ class _AvatarPageState extends State<AvatarPage>
     _loadQuotes();
   }
 
-  //
   void _startListening() {
     _userSubscription = FirebaseFirestore.instance
         .collection('users')
@@ -74,7 +72,6 @@ class _AvatarPageState extends State<AvatarPage>
       if (doc.exists) {
         final user = UserModel.fromMap(doc.id, doc.data()!);
 
-        // only re-fetch pet if equippedPetId actually changed
         if (user.equippedPetId != _cachedPetId) {
           _cachedPetId = user.equippedPetId;
           _petFuture = user.equippedPetId.isNotEmpty
@@ -92,6 +89,7 @@ class _AvatarPageState extends State<AvatarPage>
 
   void _openWardrobe(PetModel pet, String equippedPetId) {
     final colors = context.colors;
+    final lang = context.read<LanguageNotifier>();
 
     final allSkins = pet.images.keys
         .where((k) => k.startsWith('skin_'))
@@ -107,7 +105,6 @@ class _AvatarPageState extends State<AvatarPage>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            // Read live from _user every rebuild
             final petProgress = _user?.ownedPets[equippedPetId];
             final unlockedSkins = petProgress?.unlockedSkins ?? [];
             final equippedSkin = petProgress?.equippedSkinKey ?? '';
@@ -124,7 +121,6 @@ class _AvatarPageState extends State<AvatarPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle bar
                   Center(
                     child: Container(
                       width: 40,
@@ -137,7 +133,7 @@ class _AvatarPageState extends State<AvatarPage>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Apranga',
+                    lang.t('wardrobe'),
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -148,7 +144,6 @@ class _AvatarPageState extends State<AvatarPage>
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    // +1 for the "no skin" default tile
                     itemCount: allSkins.length + 1,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
@@ -156,7 +151,6 @@ class _AvatarPageState extends State<AvatarPage>
                       mainAxisSpacing: 10,
                     ),
                     itemBuilder: (_, i) {
-                      // First tile = default (no skin)
                       if (i == 0) {
                         final isEquipped = equippedSkin.isEmpty;
                         return GestureDetector(
@@ -311,6 +305,7 @@ class _AvatarPageState extends State<AvatarPage>
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -318,7 +313,7 @@ class _AvatarPageState extends State<AvatarPage>
 
     final user = _user;
     if (user == null) {
-      return const Center(child: Text("User not found"));
+      return Center(child: Text(lang.t('user_not_found')));
     }
 
     final userXp = user.xp;
@@ -326,7 +321,6 @@ class _AvatarPageState extends State<AvatarPage>
     const nextLevelXp = 100;
     final streak = user.streak;
 
-    // FutureBuilder only for pet, user is already live
     return FutureBuilder<PetModel?>(
       future: _petFuture,
       builder: (context, petSnapshot) {
@@ -336,8 +330,8 @@ class _AvatarPageState extends State<AvatarPage>
         final pet = _cachedPet;
 
         final petProgress = user.ownedPets[user.equippedPetId];
-        final petName = pet?.name ?? "No Pet";
-        final petRarity = pet?.rarity ?? "Common";
+        final petName = pet?.name ?? lang.t('no_pet');
+        final petRarity = pet?.rarity ?? lang.t('common');
         final duplicateCount = petProgress?.duplicateCount ?? 0;
         final equippedSkin = petProgress?.equippedSkinKey ?? '';
         final themeKey = context.colors.petImageKey;
@@ -351,7 +345,7 @@ class _AvatarPageState extends State<AvatarPage>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
 
-              //  Pet image card
+              // Pet image card
               Container(
                 decoration: BoxDecoration(
                   color: colors.background2,
@@ -433,7 +427,7 @@ class _AvatarPageState extends State<AvatarPage>
 
                     const SizedBox(height: 8),
                     Text(
-                      _bubbleVisible ? 'Paspausk, kad paslėptum' : 'Paspausk motyvacijai!',
+                      _bubbleVisible ? lang.t('tap_to_hide') : lang.t('tap_for_motivation'),
                       style: TextStyle(
                         fontSize: 12,
                         color: colors.appBarUnpickedColor,
@@ -499,7 +493,7 @@ class _AvatarPageState extends State<AvatarPage>
                             ),
                           ),
                           Text(
-                            'Lygis',
+                            lang.t('level'),
                             style: TextStyle(fontSize: 14, color: colors.intenseColor),
                           ),
                         ],
@@ -511,7 +505,7 @@ class _AvatarPageState extends State<AvatarPage>
 
               const SizedBox(height: 10),
 
-              // Stats + Apranga card
+              // Stats + Wardrobe card
               Row(
                 children: [
                   Expanded(
@@ -524,9 +518,9 @@ class _AvatarPageState extends State<AvatarPage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _StatRow('Dienų streakas', '$streak', colors),
+                          _StatRow(lang.t('days_streak'), '$streak', colors),
                           const SizedBox(height: 8),
-                          _StatRow('Patirties taškai', '$userXp | $nextLevelXp', colors),
+                          _StatRow(lang.t('experience_points'), '$userXp | $nextLevelXp', colors),
                         ],
                       ),
                     ),
@@ -543,7 +537,7 @@ class _AvatarPageState extends State<AvatarPage>
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        'Apranga',
+                        lang.t('wardrobe'),
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,

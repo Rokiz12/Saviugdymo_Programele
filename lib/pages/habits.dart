@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:pvp/features/habits/data/HabitRepository.dart';
 import 'package:pvp/features/habits/data/foreground_time_tracker.dart';
 import 'package:pvp/features/habits/models/models.dart';
@@ -11,8 +12,7 @@ import '../features/habits/utils/habitIcons.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/reusables.dart';
 import '../theme/app_theme.dart';
-
-
+import '../services/language_notifier.dart';
 
 class HabitsPage extends StatefulWidget {
   final String userId;
@@ -30,12 +30,8 @@ class _HabitsPageState extends State<HabitsPage> {
   List<DayLog> _monthLogs = [];
   DayLog? _today;
 
-  // Stores today's live step count for display in the row
   int _todaySteps = 0;
-
   ForegroundTimeTracker? _tracker;
-
-  // ─── INIT ───────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -46,10 +42,8 @@ class _HabitsPageState extends State<HabitsPage> {
   Future<void> _initialize() async {
     await _loadInitial();
     await _ensureAutoHabitExists();
-    await _syncStepHabits(); // ← on-launch step check
+    await _syncStepHabits();
   }
-
-  // ─── DATA LOAD ──────────────────────────────────────────────────────────────
 
   Future<void> _loadInitial() async {
     final habits = await _repo.getHabits(userId: widget.userId);
@@ -82,32 +76,22 @@ class _HabitsPageState extends State<HabitsPage> {
     });
   }
 
-  // ─── STEP SYNC ──────────────────────────────────────────────────────────────
-
-  /// Called on every app launch. Reads today's steps from Health Connect,
-  /// updates _todaySteps for the UI, saves the count to the DayLog,
-  /// and marks any step habit as complete if its goal is reached.
   Future<void> _syncStepHabits() async {
     final stepHabits = _habits.where((h) => h.kind == RatingKind.steps).toList();
     if (stepHabits.isEmpty) return;
 
     final steps = await StepService.getTodaySteps();
-    if (steps == null) return; // permission denied or read failed — silent, try again next launch
+    if (steps == null) return;
 
-    // Keep for live display in the row
     if (mounted) setState(() => _todaySteps = steps);
 
-    // Save step count and mark complete when goal is reached
     for (final h in stepHabits) {
       final goal   = h.stepGoal ?? 0;
       final isDone = steps >= goal && goal > 0;
-
-      // Always write the step count so the progress bar stays current
       _saveStepValue(h, steps, markDone: isDone);
     }
   }
 
-  /// Persists the step count into the DayLog and optionally marks it done.
   void _saveStepValue(Habit h, int steps, {required bool markDone}) {
     final now    = DateTime.now().toUtc();
     final logDay = DateTime.utc(now.year, now.month, now.day);
@@ -115,9 +99,9 @@ class _HabitsPageState extends State<HabitsPage> {
     DayLog log = _today ?? DayLog(dateUtc: logDay, entries: {});
     log = log.setValue(h.id, NumberValue(steps));
 
-    // ── keep _monthLogs in sync so goal progress reads the same value ──
     final idx = _monthLogs.indexWhere(
-          (l) => l.dateUtc.year  == logDay.year &&
+          (l) =>
+      l.dateUtc.year  == logDay.year &&
           l.dateUtc.month == logDay.month &&
           l.dateUtc.day   == logDay.day,
     );
@@ -133,11 +117,8 @@ class _HabitsPageState extends State<HabitsPage> {
     });
 
     _repo.upsertDayLog(userId: widget.userId, log: log);
-
     if (markDone) SoundService.playMarkHabit();
   }
-
-  // ─── GOAL PROGRESS ──────────────────────────────────────────────────────────
 
   int _calculateGoalProgress(Goal g) {
     final habitId = g.habbitID;
@@ -149,23 +130,19 @@ class _HabitsPageState extends State<HabitsPage> {
     switch (g.period) {
       case GoalPeriod.day:
         return goalValueOf(_today?.entries[habitId], habit);
-
       case GoalPeriod.week:
         return _monthLogs
             .where((log) => _isInCurrentWeek(log.dateUtc))
             .map((log) => goalValueOf(log.entries[habitId], habit))
             .fold(0, (a, b) => a + b);
-
       case GoalPeriod.month:
         return _monthLogs
             .map((log) => goalValueOf(log.entries[habitId], habit))
             .fold(0, (a, b) => a + b);
-
       case GoalPeriod.year:
         return _monthLogs
             .map((log) => goalValueOf(log.entries[habitId], habit))
             .fold(0, (a, b) => a + b);
-
       case GoalPeriod.custom:
         final days  = g.customDays ?? 1;
         final start = DateTime.now().toUtc().subtract(Duration(days: days));
@@ -184,8 +161,6 @@ class _HabitsPageState extends State<HabitsPage> {
         d.isBefore(sunday.add(const Duration(days: 1)));
   }
 
-  // ─── HABITS CRUD ────────────────────────────────────────────────────────────
-
   Future<void> _addHabit() async {
     final habit = await showDialog<Habit>(
       context: context,
@@ -199,7 +174,6 @@ class _HabitsPageState extends State<HabitsPage> {
     final initVal = _initialValueFor(habit);
     if (initVal != null) _setValue(habit, initVal);
 
-    // If a step habit was just created, sync immediately
     if (habit.kind == RatingKind.steps) await _syncStepHabits();
   }
 
@@ -225,15 +199,22 @@ class _HabitsPageState extends State<HabitsPage> {
 
   Future<void> _deleteHabit(Habit h) async {
     if (h.systemOnly) return;
+    final lang = context.read<LanguageNotifier>();
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Ištrinti įprotį?"),
-        content: Text("Ar tikrai norite ištrinti '${h.name}'?"),
+        title: Text(lang.t('delete_habit_title')),
+        content: Text("${lang.t('delete_habit_confirm')} '${h.name}'?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Ne")),
-          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text("Taip")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(lang.t('no')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(lang.t('yes')),
+          ),
         ],
       ),
     );
@@ -247,8 +228,6 @@ class _HabitsPageState extends State<HabitsPage> {
       _today = _today?.removeValue(h.id);
     });
   }
-
-  // ─── GOALS CRUD ─────────────────────────────────────────────────────────────
 
   Future<void> _addGoal() async {
     final goal = await showDialog<Goal>(
@@ -276,14 +255,22 @@ class _HabitsPageState extends State<HabitsPage> {
   }
 
   Future<void> _deleteGoal(Goal g) async {
+    final lang = context.read<LanguageNotifier>();
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Ištrinti tikslą?"),
-        content: Text("Ar tikrai norite ištrinti '${g.name}'?"),
+        title: Text(lang.t('delete_goal_title')),
+        content: Text("${lang.t('delete_goal_confirm')} '${g.name}'?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Ne")),
-          TextButton(onPressed: () => Navigator.pop(context, true),  child: const Text("Taip")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(lang.t('no')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(lang.t('yes')),
+          ),
         ],
       ),
     );
@@ -292,8 +279,6 @@ class _HabitsPageState extends State<HabitsPage> {
     await _repo.deleteGoal(userId: widget.userId, goalId: g.id);
     setState(() => _goals.removeWhere((x) => x.id == g.id));
   }
-
-  // ─── HABIT VALUE HANDLING ───────────────────────────────────────────────────
 
   RatingValue? _initialValueFor(Habit h) {
     switch (h.kind) {
@@ -308,7 +293,7 @@ class _HabitsPageState extends State<HabitsPage> {
             ? EnumValue(h.options!.first)
             : null;
       case RatingKind.steps:
-        return const NumberValue(0); // step count starts at 0
+        return const NumberValue(0);
     }
   }
 
@@ -316,7 +301,6 @@ class _HabitsPageState extends State<HabitsPage> {
     switch (h.kind) {
       case RatingKind.checkbox:
         return v is BoolValue ? v : const BoolValue(false);
-
       case RatingKind.number:
         if (v is NumberValue) {
           final min = h.min ?? -999999;
@@ -324,18 +308,15 @@ class _HabitsPageState extends State<HabitsPage> {
           return NumberValue(v.value.clamp(min, max));
         }
         return NumberValue(h.min ?? 0);
-
       case RatingKind.scale:
         final min = h.min ?? 1;
         final max = h.max ?? 5;
         if (v is NumberValue) return NumberValue(v.value.clamp(min, max));
         return NumberValue(min);
-
       case RatingKind.enumerator:
         final opts = h.options ?? const [];
         if (v is EnumValue && opts.contains(v.option)) return v;
         return opts.isNotEmpty ? EnumValue(opts.first) : null;
-
       case RatingKind.steps:
         return v is NumberValue ? v : const NumberValue(0);
     }
@@ -351,8 +332,6 @@ class _HabitsPageState extends State<HabitsPage> {
     setState(() => _today = newLog);
     _repo.upsertDayLog(userId: widget.userId, log: newLog);
   }
-
-  // ─── AUTO HABIT TRACKER ─────────────────────────────────────────────────────
 
   Future<void> _ensureAutoHabitExists() async {
     const auto = Habit(
@@ -374,17 +353,16 @@ class _HabitsPageState extends State<HabitsPage> {
     super.dispose();
   }
 
-  // ─── UI ─────────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
 
     if (_today == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: const CustomAppBar(title: "Įpročiai"),
+      appBar: CustomAppBar(title: lang.t('your_habits')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
@@ -397,9 +375,6 @@ class _HabitsPageState extends State<HabitsPage> {
       ),
     );
   }
-
-
-// ─── FAB ADD BUTTON ──────────────────────────────────────────────────────────
 
   Widget _fabAdd(VoidCallback onTap) {
     final colors = context.colors;
@@ -420,15 +395,14 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
-// ─── HABITS SECTION ──────────────────────────────────────────────────────────
-
   Widget _buildHabitsSection() {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader("Tavo įpročiai"),
+        SectionHeader(lang.t('your_habits')),
         const SizedBox(height: 10),
 
         ..._habits.map((h) {
@@ -459,10 +433,7 @@ class _HabitsPageState extends State<HabitsPage> {
                     Expanded(
                       child: Text(
                         h.name,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colors.textColor,
-                        ),
+                        style: TextStyle(fontSize: 14, color: colors.textColor),
                       ),
                     ),
                     _buildTrailingFor(h, v),
@@ -479,15 +450,14 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
-// ─── GOALS SECTION ───────────────────────────────────────────────────────────
-
   Widget _buildGoalsSection() {
     final colors = context.colors;
+    final lang = context.watch<LanguageNotifier>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader("Tavo tikslai"),
+        SectionHeader(lang.t('your_goals')),
         const SizedBox(height: 10),
 
         if (_goals.isEmpty)
@@ -517,15 +487,11 @@ class _HabitsPageState extends State<HabitsPage> {
                       children: [
                         Text(g.name,
                             style: TextStyle(
-                              fontSize: 14,
-                              color: colors.textColor,
-                            )),
+                                fontSize: 14, color: colors.textColor)),
                         Text(
                           "$progress / ${g.target}",
                           style: TextStyle(
-                            fontSize: 13,
-                            color: colors.appBarUnpickedColor,
-                          ),
+                              fontSize: 13, color: colors.appBarUnpickedColor),
                         ),
                       ],
                     ),
@@ -551,14 +517,12 @@ class _HabitsPageState extends State<HabitsPage> {
     );
   }
 
-  // ─── HABIT TRAILING WIDGET ──────────────────────────────────────────────────
-
   Widget _buildTrailingFor(Habit h, RatingValue? v) {
-    switch (h.kind) {
+    final lang = context.read<LanguageNotifier>();
 
+    switch (h.kind) {
       case RatingKind.checkbox:
         final checked = (v is BoolValue) ? v.value : false;
-
         if (h.systemOnly) {
           return IgnorePointer(child: Checkbox(value: checked, onChanged: null));
         }
@@ -569,7 +533,6 @@ class _HabitsPageState extends State<HabitsPage> {
 
       case RatingKind.number:
         final numVal = (v is NumberValue) ? v.value : (h.min ?? 0);
-
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -581,8 +544,7 @@ class _HabitsPageState extends State<HabitsPage> {
               constraints: const BoxConstraints(),
               onPressed: () => _setValue(
                 h,
-                NumberValue((numVal - 5).clamp(
-                    h.min ?? -999999, h.max ?? 999999)),
+                NumberValue((numVal - 5).clamp(h.min ?? -999999, h.max ?? 999999)),
               ),
             ),
             SizedBox(
@@ -599,8 +561,7 @@ class _HabitsPageState extends State<HabitsPage> {
               constraints: const BoxConstraints(),
               onPressed: () => _setValue(
                 h,
-                NumberValue((numVal + 5).clamp(
-                    h.min ?? -999999, h.max ?? 999999)),
+                NumberValue((numVal + 5).clamp(h.min ?? -999999, h.max ?? 999999)),
               ),
             ),
           ],
@@ -610,7 +571,6 @@ class _HabitsPageState extends State<HabitsPage> {
         final min     = h.min ?? 1;
         final max     = h.max ?? 5;
         final current = (v is NumberValue) ? v.value.toDouble() : min.toDouble();
-
         return SizedBox(
           width: 160,
           child: Row(
@@ -633,10 +593,9 @@ class _HabitsPageState extends State<HabitsPage> {
       case RatingKind.enumerator:
         final options  = h.options ?? const ["A", "B", "C"];
         final selected = (v is EnumValue) ? v.option : null;
-
         return DropdownButton<String>(
           value: options.contains(selected) ? selected : null,
-          hint: const Text("Pasirinkti"),
+          hint: Text(lang.t('select_hint')),
           items: options
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
               .toList(),
@@ -645,13 +604,11 @@ class _HabitsPageState extends State<HabitsPage> {
           },
         );
 
-    // ── Steps trailing widget ──────────────────────────────────────────────
       case RatingKind.steps:
-        final goal     = h.stepGoal ?? 0;
-        final steps    = _todaySteps;
-        final percent  = goal > 0 ? (steps / goal).clamp(0.0, 1.0) : 0.0;
-        final isDone   = goal > 0 && steps >= goal;
-
+        final goal    = h.stepGoal ?? 0;
+        final steps   = _todaySteps;
+        final percent = goal > 0 ? (steps / goal).clamp(0.0, 1.0) : 0.0;
+        final isDone  = goal > 0 && steps >= goal;
         return SizedBox(
           width: 140,
           child: Column(
@@ -662,16 +619,14 @@ class _HabitsPageState extends State<HabitsPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isDone)
-                    const Icon(Icons.check_circle,
-                        color: Colors.green, size: 16),
+                    const Icon(Icons.check_circle, color: Colors.green, size: 16),
                   if (isDone) const SizedBox(width: 4),
                   Text(
                     "$steps / $goal",
                     style: TextStyle(
                       fontSize: 13,
                       color: isDone ? Colors.green : Colors.black87,
-                      fontWeight:
-                      isDone ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ],

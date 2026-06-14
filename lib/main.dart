@@ -20,20 +20,27 @@ import '/data/repositories/user_repository.dart';
 import 'widgets/reward_dialog.dart';
 import 'services/fcm_service.dart';
 import 'services/theme_notifier.dart';
+import 'services/language_notifier.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   preloadPetImages();
+
+  // Create and initialize language notifier (loads date symbols)
+  final languageNotifier = LanguageNotifier();
+  await languageNotifier.initializeDateSymbols();
+
   runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => RewardNotifier()),
-          ChangeNotifierProvider(create: (_) => ThemeNotifier()),
-        ],
-        child: const MyApp(),
-      )
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => RewardNotifier()),
+        ChangeNotifierProvider(create: (_) => ThemeNotifier()),
+        ChangeNotifierProvider(create: (_) => languageNotifier),
+      ],
+      child: const MyApp(),
+    ),
   );
 }
 
@@ -202,17 +209,18 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
     return Scaffold(
       body: TabBarView(controller: tabController, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: onItemTapped,
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Avataras"),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Statistikos"),
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: "Įpročiai"),
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: "Dienoraštis"),
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: lang.t('nav_avatar')),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: lang.t('nav_statistics')),
+          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: lang.t('nav_habits')),
+          BottomNavigationBarItem(icon: Icon(Icons.book), label: lang.t('nav_diary')),
         ],
       ),
     );

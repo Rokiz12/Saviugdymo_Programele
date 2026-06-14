@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/language_notifier.dart';
 
 class BestMonthCard extends StatefulWidget {
-  final String monthName;       // e.g. "May 2026"
-  final double completionRate;  // 0.0 – 1.0
+  final String monthName;
+  final double completionRate;
   final int completedDays;
   final int totalDays;
   final int longestStreak;
   final int habitsLogged;
-  final double avgRate;         // monthly average 0.0 – 1.0
+  final double avgRate;
   final int betterThanMonths;
   final int totalMonths;
 
@@ -54,6 +56,7 @@ class _BestMonthCardState extends State<BestMonthCard>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageNotifier>();
     final amber = const Color(0xFFBA7517);
     final amberLight = const Color(0xFFFAEEDA);
     final surface = Theme.of(context).colorScheme.surfaceContainerHighest
@@ -85,7 +88,7 @@ class _BestMonthCardState extends State<BestMonthCard>
               Icon(Icons.emoji_events_outlined, size: 15, color: amber),
               const SizedBox(width: 6),
               Text(
-                'BEST MONTH',
+                lang.t('best_month'),
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -130,7 +133,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                             ),
                           ),
                           Text(
-                            'done',
+                            lang.t('done'),
                             style: TextStyle(
                               fontSize: 11,
                               color: Theme.of(context).colorScheme.onSurface
@@ -144,29 +147,31 @@ class _BestMonthCardState extends State<BestMonthCard>
                 ),
               ),
               const SizedBox(width: 24),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${(widget.completionRate * 100).round()}% completed',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${(widget.completionRate * 100).round()}% ${lang.t('completed')}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Your highest rate\nacross all months',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.5),
-                      height: 1.5,
+                    const SizedBox(height: 4),
+                    Text(
+                      lang.t('highest_rate_desc'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
+                        height: 1.5,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -181,15 +186,15 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.calendar_month_outlined,
                 iconColor: const Color(0xFF639922),
                 value: '${widget.completedDays} / ${widget.totalDays}',
-                label: 'days completed',
+                label: lang.t('days_completed'),
                 surface: surface,
               )),
               const SizedBox(width: 12),
               Expanded(child: _StatTile(
                 icon: Icons.local_fire_department_outlined,
                 iconColor: const Color(0xFFD85A30),
-                value: '${widget.longestStreak} days',
-                label: 'longest streak',
+                value: '${widget.longestStreak} ${lang.t('days_streak')}',
+                label: lang.t('longest_streak'),
                 surface: surface,
               )),
             ],
@@ -201,7 +206,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.checklist_outlined,
                 iconColor: const Color(0xFF378ADD),
                 value: '${widget.habitsLogged}',
-                label: 'habits logged',
+                label: lang.t('habits_logged'),
                 surface: surface,
               )),
               const SizedBox(width: 12),
@@ -209,7 +214,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 icon: Icons.track_changes_outlined,
                 iconColor: const Color(0xFF7F77DD),
                 value: '4 / 4',
-                label: 'goals on track',
+                label: lang.t('goals_on_track'),
                 surface: surface,
               )),
             ],
@@ -221,7 +226,7 @@ class _BestMonthCardState extends State<BestMonthCard>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'vs. monthly average (${(widget.avgRate * 100).round()}%)',
+                '${lang.t('vs_monthly_average')} (${(widget.avgRate * 100).round()}%)',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context)
@@ -273,7 +278,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  'Better than ',
+                  lang.t('better_than'),
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context)
@@ -290,7 +295,7 @@ class _BestMonthCardState extends State<BestMonthCard>
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(
-                    '${widget.betterThanMonths} of ${widget.totalMonths} months',
+                    '${widget.betterThanMonths} ${lang.t('of')} ${widget.totalMonths} ${lang.t('months')}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

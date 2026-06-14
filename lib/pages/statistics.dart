@@ -599,118 +599,111 @@ class _StatisticsPageState extends State<StatisticsPage>
               builder: (context) {
                 final colors = context.colors;
                 final moodColor = Colors.amber[800]!;
-
-                final barGroups = spots
-                    .map(
-                      (spot) => BarChartGroupData(
-                    x: spot.x.toInt(),
-                    barRods: [
-                      BarChartRodData(
-                        toY: spot.y,
-                        width: 6,
-                        color: spot.y > 0 ? moodColor : Colors.transparent,
-                        borderRadius: BorderRadius.circular(4),
+                return LineChart(
+                  LineChartData(
+                    minY: 0,
+                    maxY: 5,
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: spots.where((s) => s.y > 0).toList(),
+                        isCurved: true,
+                        color: moodColor,
+                        barWidth: 3,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, bar, index) =>
+                              FlDotCirclePainter(
+                                radius: 4,
+                                color: moodColor,
+                                strokeWidth: 2,
+                                strokeColor: Colors.white,
+                              ),
+                        ),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: moodColor.withOpacity(0.15),
+                        ),
                       ),
                     ],
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: 1,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: Colors.grey.withOpacity(0.2),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 30,
+                          getTitlesWidget: (value, meta) {
+                            final day = value.toInt();
+                            final show = day == 1 || day == 5 || day == 10 ||
+                                day == 15 || day == 20 || day == 25 || day == 30;
+                            return show
+                                ? Text(day.toString(), style: const TextStyle(fontSize: 10))
+                                : const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 80,
+                          interval: 1,
+                          getTitlesWidget: (value, meta) {
+                            final moods = [
+                              lang.t('mood_bad'),
+                              lang.t('mood_poor'),
+                              lang.t('mood_normal'),
+                              lang.t('mood_good'),
+                              lang.t('mood_great'),
+                            ];
+                            final index = value.toInt() - 1;
+                            return (index >= 0 && index < moods.length)
+                                ? Text(
+                              moods[index],
+                              style: const TextStyle(fontSize: 10),
+                              overflow: TextOverflow.ellipsis,
+                            )
+                                : const SizedBox.shrink();
+                          },
+                        ),
+                      ),
+                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    lineTouchData: LineTouchData(
+                      enabled: true,
+                      touchTooltipData: LineTouchTooltipData(
+                        getTooltipColor: (_) => colors.background2,
+                        tooltipRoundedRadius: 8,
+                        getTooltipItems: (touchedSpots) {
+                          const emojis = {1: '😭', 2: '😢', 3: '😐', 4: '🙂', 5: '😀'};
+                          return touchedSpots.map((spot) {
+                            final mood = spot.y.round();
+                            return LineTooltipItem(
+                              '${emojis[mood] ?? ''} ${spot.y.toStringAsFixed(1)}',
+                              TextStyle(
+                                color: colors.textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            );
+                          }).toList();
+                        },
+                      ),
+                    ),
                   ),
-                )
-                    .toList();
-
-                return BarChart(
-                    BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        minY: 0,
-                        maxY: 5,
-                        barGroups: barGroups,
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 1,
-                          getDrawingHorizontalLine: (value) => FlLine(
-                            color: Colors.grey.withOpacity(0.2),
-                            strokeWidth: 1,
-                          ),
-                        ),
-                        borderData: FlBorderData(
-                          show: true,
-                          border: Border.all(
-                            color: Colors.grey.withOpacity(0.3),
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          show: true,
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 30,
-                              getTitlesWidget: (value, meta) {
-                                final day = value.toInt();
-                                final show = day == 1 || day == 5 || day == 10 ||
-                                    day == 15 || day == 20 || day == 25 || day == 30;
-                                return show
-                                    ? Text(
-                                  day.toString(),
-                                  style: const TextStyle(fontSize: 10),
-                                )
-                                    : const SizedBox.shrink();
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 80,
-                              interval: 1,
-                              getTitlesWidget: (value, meta) {
-                                final moods = [
-                                  lang.t('mood_bad'),
-                                  lang.t('mood_poor'),
-                                  lang.t('mood_normal'),
-                                  lang.t('mood_good'),
-                                  lang.t('mood_great'),
-                                ];
-                                final index = value.toInt() - 1;
-                                return (index >= 0 && index < moods.length)
-                                    ? Text(
-                                  moods[index],
-                                  style: const TextStyle(fontSize: 10),
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                                    : const SizedBox.shrink();
-                              },
-                            ),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchTooltipData: BarTouchTooltipData(
-                            getTooltipColor: (_) => colors.background2,
-                            tooltipRoundedRadius: 8,
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              const emojis = {
-                                1: '😭',
-                                2: '😢',
-                                3: '😐',
-                                4: '🙂',
-                                5: '😀',
-                              };
-                              final mood = rod.toY.round();
-                              return BarTooltipItem(
-                                  '${emojis[mood] ?? ''} ${rod.toY.toStringAsFixed(1)}',
-                                  TextStyle(
-                                    color: colors.textColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ));
-                            },
-                          ),
-                        )));
+                );
               },
             ),
           ),
